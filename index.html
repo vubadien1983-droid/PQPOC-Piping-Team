@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en" translate="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Piping Fabrication & Testing Management App</title>
+  <meta name="description" content="Extended Piping Fabrication, Welding, NDT, and Hydrotest management dashboard for Block B CPP Topside.">
+  <meta name="author" content="Antigravity">
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="style.css?v=1782944937">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+  <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+  <script>window.SQLITE_DB_URL="https://raw.githubusercontent.com/vubadien1983-droid/piping-data/main/piping_data.db.gz";</script>
+  <script>if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{updateViaCache:"none"}).catch(function(){});});}</script>
+</head>
+<body>
+  <!-- Ambient background glow elements -->
+  <div class="ambient-glow bg-glow-1"></div>
+  <div class="ambient-glow bg-glow-2"></div>
+
+  <div class="app-wrapper">
+    <!-- Top Header Navigation Bar -->
+    <header class="app-navbar">
+      <div class="navbar-brand">
+        <div class="brand-logo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+          </svg>
+        </div>
+        <div>
+          <h1>BLOCK B CPP TOPSIDE</h1>
+          <div class="subtitle">PIPING FAB & TESTING DASHBOARD</div>
+        </div>
+      </div>
+      <nav class="app-tabs">
+        <button class="tab-btn active" id="tab-analytics-view">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="tab-icon">
+            <line x1="18" y1="20" x2="18" y2="10"></line>
+            <line x1="12" y1="20" x2="12" y2="4"></line>
+            <line x1="6" y1="20" x2="6" y2="14"></line>
+          </svg>
+          Project Dashboard
+        </button>
+        <button class="tab-btn" id="tab-fab-view">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="tab-icon">
+            <rect x="3" y="3" width="7" height="9" rx="1"></rect>
+            <rect x="14" y="3" width="7" height="5" rx="1"></rect>
+            <rect x="14" y="12" width="7" height="9" rx="1"></rect>
+            <rect x="3" y="16" width="7" height="5" rx="1"></rect>
+          </svg>
+          Testing Status
+        </button>
+        <button class="tab-btn" id="tab-database-view">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="tab-icon">
+            <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+            <path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"></path>
+          </svg>
+          Database
+        </button>
+        <button class="tab-btn" id="tab-testingdata-view">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="tab-icon">
+            <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+            <path d="M3 9h18M3 15h18M9 3v18M15 3v18"></path>
+          </svg>
+          Testing Data
+        </button>
+        <button class="tab-btn" id="tab-ai-view">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="tab-icon">
+            <path d="M12 2a2 2 0 0 1 2 2v1h3a2 2 0 0 1 2 2v3h1a2 2 0 0 1 0 4h-1v3a2 2 0 0 1-2 2h-3v1a2 2 0 0 1-4 0v-1H5a2 2 0 0 1-2-2v-3H2a2 2 0 0 1 0-4h1V7a2 2 0 0 1 2-2h3V4a2 2 0 0 1 2-2z"></path>
+            <circle cx="9" cy="10" r="1.2" fill="currentColor"></circle>
+            <circle cx="15" cy="10" r="1.2" fill="currentColor"></circle>
+            <path d="M9 15c1 1 5 1 6 0"></path>
+          </svg>
+          AI Assistant
+        </button>
+      </nav>
+      <!-- Source-file metadata (when the Fabrication data was actually exported) -->
+      <div class="header-sync-info" id="header-sync-info" title="Source file the Fabrication (PMS) data was exported from"></div>
+      <!-- Manual precompute re-sync: rebuild testpack_summary + daily_progress (incl. cold data) from the current DB -->
+      <button class="btn btn-secondary" id="resync-data-btn"
+              title="Re-sync data: rebuild the dashboard summary &amp; S-curve (including cold / hydro-done packages) from the current database"
+              style="display:flex; align-items:center; gap:0.4rem; padding:0.35rem 0.7rem; font-size:0.75rem; min-height:auto; white-space:nowrap;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon" style="width:14px; height:14px;">
+          <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+        </svg>
+        <span id="resync-data-label">Re-sync data</span>
+      </button>
+      <!-- Main Status Indicator -->
+      <div class="status-indicator">
+        <span class="pulse-dot green"></span>
+        <span id="connection-status">Connecting Database...</span>
+      </div>
+    </header>
+
+
+    <!-- TESTING STATUS VIEW -->
+    <div id="fab-view-container" class="tab-content" style="display: none; flex-direction: column; height: calc(100% - 55px); overflow: hidden; width: 100%;">
+      <div class="dashboard-grid">
+        <!-- Panel 1: General Information (Left Panel) -->
+        <aside class="left-panel card">
+          <div class="panel-header" style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div>
+              <h2>General Information</h2>
+              <p class="panel-subtitle">Total progress by System</p>
+            </div>
+            <button class="btn-icon-only" id="export-general-excel-btn" title="Export General Info Excel">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+                <polyline points="10 9 9 9 8 9"></polyline>
+              </svg>
+            </button>
+          </div>
+          <div class="panel-search">
+            <input type="text" id="system-search" placeholder="Filter systems (e.g. AI, AU)...">
+          </div>
+          <div class="table-container left-table-scroll">
+            <table class="summary-table" id="systems-table">
+              <thead>
+                <tr>
+                  <th>System</th>
+                  <th>Welding</th>
+                  <th>NDT</th>
+                  <th>Hydrotest</th>
+                  <th>Re-ins</th>
+                </tr>
+              </thead>
+              <tbody id="systems-table-body">
+                <tr>
+                  <td colspan="5" class="text-center" style="padding: 3rem;">
+                    <div class="loading-spinner-small"></div>
+                    <p style="margin-top: 1rem; font-size: 0.8rem; color: var(--text-muted);">Loading systems...</p>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="panel-footer">
+            <p>Block B CPP &copy; 2026. Piping Fabrication Management. Offline Sync.</p>
+          </div>
+        </aside>
+
+        <!-- Vertical Resizer Splitter -->
+        <div class="splitter vertical" id="main-splitter"></div>
+
+        <!-- Right Panel Container (Splits Vertically) -->
+        <main class="right-panel">
+          <!-- Panel 2: System Overview (Top Right) -->
+          <section class="overview-panel card">
+            <div class="overview-header" style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%;">
+              <div>
+                <h2 style="font-size: 0.8rem; margin-bottom: 0.15rem;">System Overview</h2>
+                <p class="panel-subtitle">Interactive Test Package Hydrotest Status Overview</p>
+              </div>
+              <button id="view-all-packages-btn" class="btn btn-primary view-all-btn" title="Show every Test Package in the whole project">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+                  <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+                  <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+                  <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+                  <rect x="14" y="14" width="7" height="7" rx="1"></rect>
+                </svg>
+                View all packages
+              </button>
+            </div>
+            
+            <!-- Flexible horizontal layout container for vertical legend and chart viewer -->
+            <div class="overview-content-container">
+              <!-- Color Status Legend (Vertical layout on the left) -->
+              <div class="status-legend">
+                <div class="legend-item" data-status="done"><span class="legend-color done"></span> Done Hydrotest</div>
+                <div class="legend-item" data-status="ready"><span class="legend-color ready"></span> Ready for Hydrotest</div>
+                <div class="legend-item" data-status="progress"><span class="legend-color progress"></span> Welding/NDT In-Progress</div>
+                <div class="legend-item" data-status="reinst"><span class="legend-color reinst"></span> Reinstated</div>
+                <div class="legend-item" data-status="leak"><span class="legend-color leak"></span> Ready for Leak Test</div>
+                <div class="legend-item" data-status="pending"><span class="legend-color pending"></span> Pending</div>
+              </div>
+              
+              <!-- Interactive Deck Visual Layout (Pie Chart & Summary) -->
+              <div class="deck-layout-viewer" id="deck-layout-container">
+                <div class="no-selection-message">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                  <h3>No System Selected</h3>
+                  <p>Select a system in the Left Panel to visualize its Test Package Hydrotest Status Overview.</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Horizontal Resizer Splitter -->
+          <div class="splitter horizontal" id="right-splitter"></div>
+
+          <!-- Panel 3: System Detailed (Bottom Right) -->
+          <section class="detailed-panel card">
+            <div class="detailed-header">
+              <div>
+                <h2 id="detailed-panel-title">System Detailed: <span class="unselected-text">None Selected</span></h2>
+                <p class="panel-subtitle">Test Packages & Spool/Joint Details</p>
+              </div>
+              <div class="detailed-actions" id="detailed-actions-bar" style="display: none;">
+                <!-- Potential Hydrotest Filter Widget -->
+                <div class="potential-filter-widget" id="potential-filter-widget" style="display: flex; align-items: center; gap: 0.5rem; background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05); padding: 0.25rem 0.5rem; border-radius: 6px; margin-right: 0.5rem;">
+                  <span style="font-size: 0.7rem; font-weight: 600; color: var(--text-muted);">Potential:</span>
+                  <div style="display: flex; align-items: center; gap: 0.25rem;">
+                    <span style="font-size: 0.65rem; color: var(--text-muted);">Weld &ge;</span>
+                    <input type="number" id="potential-weld-input" value="90" min="0" max="100" style="width: 42px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; color: #fff; padding: 0.15rem 0.3rem; font-size: 0.7rem; text-align: center; outline: none; -moz-appearance: textfield;">
+                    <span style="font-size: 0.65rem; color: var(--text-muted);">%</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 0.25rem;">
+                    <span style="font-size: 0.65rem; color: var(--text-muted);">NDT &ge;</span>
+                    <input type="number" id="potential-ndt-input" value="90" min="0" max="100" style="width: 42px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; color: #fff; padding: 0.15rem 0.3rem; font-size: 0.7rem; text-align: center; outline: none; -moz-appearance: textfield;">
+                    <span style="font-size: 0.65rem; color: var(--text-muted);">%</span>
+                  </div>
+                  <button class="btn btn-primary" id="potential-filter-btn" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; line-height: 1.2; border-radius: 4px; min-height: auto;">Filter</button>
+                  <button id="potential-clear-btn" class="search-clear-btn" style="display: none; position: static; background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.1rem; line-height: 1; padding: 0 4px;" title="Clear potential filter">&times;</button>
+                </div>
+
+                <!-- Clear All Filters Button -->
+              <button id="clear-all-filters-btn" class="btn btn-secondary" style="display: none; padding: 0.25rem 0.5rem; font-size: 0.7rem; border-color: rgba(244, 63, 94, 0.3); color: #f43f5e; margin-right: 0.5rem; min-height: auto;" title="Xoá tất cả bộ lọc ở tab này">Xoá bộ lọc</button>
+              
+              <div class="detailed-search-box" style="position: relative; display: flex; align-items: center;">
+                  <input type="text" id="tp-filter-input" placeholder="Quick filter packages...">
+                  <button id="tp-search-clear-btn" class="search-clear-btn" title="Clear filter">&times;</button>
+                </div>
+                <button class="btn btn-secondary" id="export-excel-btn">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                  </svg>
+                  Export System Excel
+                </button>
+
+              </div>
+            </div>
+            <div class="table-container detailed-table-scroll" id="detailed-table-container">
+              <div class="no-selection-message">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <h3>No Detailed Data</h3>
+                <p>Select a system on the Left Panel to load detailed Test Package logs.</p>
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <!-- Tab 2: Project Dashboard View -->
+    <div id="analytics-view-container" class="tab-content dashboard-v2" style="display: flex; flex-direction: column; gap: 0.7rem; height: calc(100% - 55px); overflow-y: auto; width: 100%;">
+
+      <!-- Top row (3 columns): General (left) | Fabrication (middle) | Welding/Bonding (right) -->
+      <div class="dash-top-row">
+
+      <!-- ZONE 1: General Information -->
+      <section class="dash-zone card" id="zone-general">
+        <div class="dash-zone-header">
+          <span class="dash-zone-tag tag-blue">Zone 1</span>
+          <h2>General Information</h2>
+        </div>
+        <div class="dash-zone-body zone1-grid">
+          <div class="stat-card">
+            <span class="stat-card-label">Total Systems</span>
+            <div class="stat-card-main"><span class="stat-big" id="z1-systems">0</span></div>
+            <span class="stat-card-sub">Active piping systems</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-card-label">Hydrotest Packages <small style="font-weight:400; color:var(--text-faded); text-transform:none;">(from Google Sheet)</small></span>
+            <div class="stat-card-main">
+              <span class="stat-frac" id="z1-hydro-val">0 / 0</span>
+              <span class="stat-pct" id="z1-hydro-pct">0%</span>
+            </div>
+            <div class="stat-bar"><div class="stat-bar-fill hydro" id="z1-hydro-bar" style="width:0%"></div></div>
+            <a id="z1-hydro-note" class="stat-warn-note" style="display:none;" title="Click to export the list">⚠ <span id="z1-hydro-note-count">0</span> test packages in Sheet but NOT in Fabrication Data — click to export</a>
+          </div>
+          <div class="stat-card">
+            <span class="stat-card-label">Leak Test Packages</span>
+            <div class="stat-card-main">
+              <span class="stat-frac" id="z1-leak-val">0 / 0</span>
+              <span class="stat-pct" id="z1-leak-pct">0%</span>
+            </div>
+            <div class="stat-bar"><div class="stat-bar-fill leak" id="z1-leak-bar" style="width:0%"></div></div>
+            <span id="z1-leak-note" class="stat-card-sub" style="display:none; color:var(--text-faded); font-style:italic;">Not yet update information in Database</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ZONE 2: Fabrication Information (clickable -> drives Zone 3 chart) -->
+      <section class="dash-zone card" id="zone-fab">
+        <div class="dash-zone-header">
+          <span class="dash-zone-tag tag-purple">Zone 2</span>
+          <h2>Fabrication Information</h2>
+          <span class="dash-zone-hint">Click a metric to plot it on the chart below</span>
+        </div>
+        <div class="dash-zone-body zone2-grid">
+          <button class="metric-card" data-metric="dia" title="Tổng Dia-Inch đã hàn (Visual ACC) / tổng Dia-Inch dự án — biểu đồ theo ngày hàn">
+            <span class="metric-dot" style="background:#14b8a6"></span>
+            <span class="metric-card-label">Dia Inch</span>
+            <span class="metric-frac" id="z2-dia-val">0 / 0</span>
+            <span class="metric-pct" id="z2-dia-pct">0%</span>
+            <div class="stat-bar"><div class="stat-bar-fill" id="z2-dia-bar" style="width:0%;background:#14b8a6"></div></div>
+          </button>
+          <button class="metric-card" data-metric="weld">
+            <span class="metric-dot" style="background:#0ea5e9"></span>
+            <span class="metric-card-label">Welding</span>
+            <span class="metric-frac" id="z2-weld-val">0 / 0</span>
+            <span class="metric-pct" id="z2-weld-pct">0%</span>
+            <div class="stat-bar"><div class="stat-bar-fill weld" id="z2-weld-bar" style="width:0%"></div></div>
+          </button>
+          <button class="metric-card" data-metric="rt">
+            <span class="metric-dot" style="background:#3b82f6"></span>
+            <span class="metric-card-label">RT</span>
+            <span class="metric-frac" id="z2-rt-val">0 / 0</span>
+            <span class="metric-pct" id="z2-rt-pct">0%</span>
+            <div class="stat-bar"><div class="stat-bar-fill rt" id="z2-rt-bar" style="width:0%"></div></div>
+          </button>
+          <button class="metric-card" data-metric="paut">
+            <span class="metric-dot" style="background:#8b5cf6"></span>
+            <span class="metric-card-label">PAUT</span>
+            <span class="metric-frac" id="z2-paut-val">0 / 0</span>
+            <span class="metric-pct" id="z2-paut-pct">0%</span>
+            <div class="stat-bar"><div class="stat-bar-fill paut" id="z2-paut-bar" style="width:0%"></div></div>
+          </button>
+          <button class="metric-card" data-metric="mt">
+            <span class="metric-dot" style="background:#f59e0b"></span>
+            <span class="metric-card-label">MT</span>
+            <span class="metric-frac" id="z2-mt-val">0 / 0</span>
+            <span class="metric-pct" id="z2-mt-pct">0%</span>
+            <div class="stat-bar"><div class="stat-bar-fill mt" id="z2-mt-bar" style="width:0%"></div></div>
+          </button>
+          <button class="metric-card" data-metric="pt">
+            <span class="metric-dot" style="background:#ef4444"></span>
+            <span class="metric-card-label">PT</span>
+            <span class="metric-frac" id="z2-pt-val">0 / 0</span>
+            <span class="metric-pct" id="z2-pt-pct">0%</span>
+            <div class="stat-bar"><div class="stat-bar-fill pt" id="z2-pt-bar" style="width:0%"></div></div>
+          </button>
+        </div>
+      </section>
+
+      <!-- RIGHT column: Welding / Bonding Progress table -->
+      <section class="dash-zone card" id="zone-material">
+        <div class="dash-zone-header">
+          <span class="dash-zone-tag tag-teal">Progress</span>
+          <h2>Welding / Bonding Progress</h2>
+        </div>
+        <div class="dash-zone-body" style="overflow-x:auto;">
+          <div style="font-size:0.72rem; color:var(--text-faded); margin-bottom:0.4rem;">Click a JointNo / Dia-Inch cell to plot it on the chart below</div>
+          <table class="material-progress-table" id="material-progress-table">
+            <thead>
+              <tr>
+                <th>Material</th>
+                <th style="text-align: center;">JointNo (Done / Total)</th>
+                <th style="text-align: center;">Dia-Inch (Done / Total)</th>
+              </tr>
+            </thead>
+            <tbody id="material-progress-body">
+              <!-- Populated by app.js renderMaterialProgress() -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      </div><!-- /.dash-top-row -->
+
+      <!-- ZONE 3: Interactive Line Chart -->
+      <section class="dash-zone card dash-zone-chart" id="zone-chart">
+        <div class="dash-zone-header">
+          <span class="dash-zone-tag tag-green">Zone 3</span>
+          <h2>Cumulative Progress S-Curve</h2>
+          <div class="chart-mode-toggle" id="chart-mode-toggle">
+            <button class="chart-mode-btn active" data-mode="testing">Hydrotest</button>
+            <button class="chart-mode-btn" data-mode="fabrication">Total NDT &amp; Fabrication</button>
+          </div>
+          <div class="chart-gran-toggle" id="chart-gran-toggle" title="Zoom level: Day / Week / Month">
+            <button class="gran-btn active" data-gran="day">Day</button>
+            <button class="gran-btn" data-gran="week">Week</button>
+            <button class="gran-btn" data-gran="month">Month</button>
+          </div>
+          <span class="dash-zone-hint" id="chart-current-label">Showing: Hydrotest</span>
+        </div>
+        <div class="dash-zone-body chart-body">
+          <div id="s-curve-chart" class="chart-canvas-wrap">
+            <canvas id="analyticsChart"></canvas>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Tab 3: Database View -->
+    <div id="database-view-container" class="tab-content" style="display: none; flex-direction: column; gap: 0.8rem; height: calc(100% - 55px); overflow: hidden; width: 100%;">
+      <div class="database-grid-layout" style="display: grid; grid-template-columns: var(--db-left-panel-width, 280px) 4px 1fr; flex-grow: 1; overflow: hidden; height: calc(100% - 60px);">
+        <!-- Panel Left: Column List -->
+        <aside class="left-panel card" style="height: 100%; display: flex; flex-direction: column;">
+          <div class="panel-header" style="padding: 0.8rem 1rem 0.5rem; flex-shrink: 0;">
+            <h2>Database Columns</h2>
+            <p class="panel-subtitle" id="db-columns-subtitle">Columns 1-52 (Fab) & 53-68 (Test)</p>
+          </div>
+          <div class="panel-search" style="padding: 0 1rem 0.6rem; flex-shrink: 0; display: flex; flex-direction: column; gap: 8px;">
+            <input type="text" id="db-column-search" placeholder="Filter columns by name..." style="flex-grow: 1;">
+            <div class="db-source-selector" style="display: flex; gap: 4px; width: 100%;">
+              <button class="btn btn-secondary btn-xs active" id="btn-source-all" style="flex: 1; padding: 4px 2px; font-size: 0.65rem; min-height: auto; text-transform: none; border-radius: 4px;">All Data</button>
+              <button class="btn btn-secondary btn-xs" id="btn-source-pms" style="flex: 1; padding: 4px 2px; font-size: 0.65rem; min-height: auto; text-transform: none; border-radius: 4px;">PMS Data</button>
+              <button class="btn btn-secondary btn-xs" id="btn-source-testing" style="flex: 1; padding: 4px 2px; font-size: 0.65rem; min-height: auto; text-transform: none; border-radius: 4px;">Testing Data</button>
+            </div>
+          </div>
+          <div class="table-container" style="flex-grow: 1; overflow-y: auto; border-top: 1px solid rgba(255, 255, 255, 0.04);">
+            <ul id="db-column-list" class="db-column-list-style" style="list-style: none; padding: 0.4rem 0.8rem; margin: 0;">
+              <!-- Dynamically populated -->
+            </ul>
+          </div>
+        </aside>
+
+        <!-- Vertical Resizer Splitter -->
+        <div class="splitter vertical" id="db-main-splitter" style="width: 4px; cursor: col-resize; z-index: 10; background: rgba(255,255,255,0.02);"></div>
+
+        <!-- Panel Right: Table Grid -->
+        <main class="right-panel card" style="height: 100%; display: flex; flex-direction: column; overflow: hidden;">
+          <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center; padding: 0.8rem 1rem; border-bottom: 1px solid rgba(255, 255, 255, 0.05); flex-shrink: 0;">
+            <div>
+              <h2>Database Preview</h2>
+              <p class="panel-subtitle" id="db-preview-subtitle">Joint-by-joint fabrication log</p>
+            </div>
+            <div style="display: flex; align-items: center; gap: 1rem;">
+              <!-- Clear All Filters Button (Database tab) -->
+              <button id="db-clear-all-filters-btn" class="btn btn-secondary" style="display: none; padding: 0.25rem 0.5rem; font-size: 0.7rem; border-color: rgba(244, 63, 94, 0.3); color: #f43f5e; margin-right: 0.5rem; min-height: auto;" title="Xoá tất cả bộ lọc ở tab này">Xoá bộ lọc</button>
+              
+              <div class="detailed-search-box" style="position: relative; display: flex; align-items: center;">
+                <input type="text" id="db-right-panel-filter" placeholder="Filter preview table..." style="width: 200px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 6px; color: var(--text-main); padding: 0.4rem 0.6rem; font-size: 0.75rem; outline: none; font-family: var(--font-sans);">
+                <button id="db-right-panel-filter-clear-btn" class="search-clear-btn" style="position: absolute; right: 8px; background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 1rem; display: none;">&times;</button>
+              </div>
+              <button class="btn btn-primary" id="db-refresh-btn" style="display: flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.8rem; font-size: 0.8rem;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon" style="width: 14px; height: 14px;">
+                  <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                </svg>
+                Refresh dữ liệu
+              </button>
+              <button class="btn btn-secondary" id="db-export-excel-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon" style="width: 14px; height: 14px; margin-right: 4px;">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                  <line x1="16" y1="13" x2="8" y2="13"></line>
+                  <line x1="16" y1="17" x2="8" y2="17"></line>
+                </svg>
+                Export Excel
+              </button>
+            </div>
+          </div>
+
+          <div class="table-container database-table-scroll" id="db-table-container" style="flex-grow: 1; overflow: auto; position: relative;">
+            <div class="no-selection-message">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/>
+              </svg>
+              <h3>Database View</h3>
+              <p>Upload a fabrication Excel file to visualize the joint-by-joint data mapped with live Google Sheet statuses.</p>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <!-- Tab 4: Testing Data — the live "NDT Tracking" Google Sheet, embedded as-is
+         (data entry, filters, formulas and internal links all work natively). -->
+    <div id="testingdata-view-container" class="tab-content" style="display: none; flex-direction: column; height: calc(100% - 55px); overflow: hidden; width: 100%;">
+      <iframe id="testingdata-iframe"
+              data-src="https://docs.google.com/spreadsheets/d/189xNkXF5aBnyR3yLNvT-Usf___5ps4uh/edit?gid=210321955"
+              title="Testing Data — NDT Tracking (live Google Sheet)"
+              style="width:100%; height:100%; border:0; border-radius:8px; background:#fff;"></iframe>
+    </div>
+
+    <!-- Tab 5: AI Assistant — ask-your-data (NotebookLM-style text-to-SQL over the local DB) -->
+    <div id="ai-view-container" class="tab-content" style="display: none; flex-direction: column; height: calc(100% - 55px); overflow-y: auto; width: 100%;">
+      <section class="dash-zone card" id="zone-ai">
+        <div class="dash-zone-header">
+          <span class="dash-zone-tag tag-teal">AI</span>
+          <h2>AI Assistant — Ask your data</h2>
+          <span class="dash-zone-hint">Hỏi bằng tiếng Việt/Anh · AI tự truy vấn dữ liệu piping (dữ liệu không rời máy)</span>
+        </div>
+        <div class="ai-body">
+          <div class="ai-input-row">
+            <textarea id="ai-question" class="ai-question" rows="2"
+              placeholder="Ví dụ: Liệt kê các jointNo đã PWHT ở mối gốc nhưng phải repair/reweld — gồm Test pack, Line, SpoolNo, JointNo, NDT, PWHT gốc và repair…"></textarea>
+            <button class="btn btn-primary" id="ai-ask-btn">Hỏi AI</button>
+          </div>
+          <div class="ai-examples-label">Gợi ý (bấm để chạy):</div>
+          <div id="ai-examples" class="ai-examples"></div>
+          <div id="ai-status" class="ai-status" style="display:none;"></div>
+          <div id="ai-result" class="ai-result"></div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Details Preview Modal -->
+  <div id="tp-detail-modal" class="modal-backdrop" style="display: none;">
+    <div class="modal-content card">
+      <div class="modal-header">
+        <h2 id="modal-tp-title">Test Package Details</h2>
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <button class="btn btn-secondary" id="modal-export-excel-btn" style="padding: 0.35rem 0.65rem; font-size: 0.7rem;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon" style="width: 12px; height: 12px;">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+            </svg>
+            Export Test Pack
+          </button>
+          <button class="btn btn-secondary" id="modal-export-backlog-btn" style="padding: 0.35rem 0.65rem; font-size: 0.7rem; border-color: rgba(245, 158, 11, 0.4); color: #fbbf24;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon" style="width: 12px; height: 12px;">
+              <path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+            </svg>
+            Export Backlog
+          </button>
+          <button class="modal-close-btn" id="modal-close-btn">&times;</button>
+        </div>
+      </div>
+      <div class="modal-body" id="modal-body-content">
+        <!-- Content dynamically populated by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Global Excel-like Filter Popup -->
+  <div id="excel-filter-popup" class="excel-filter-popup" style="display: none;">
+    <div style="display: flex; gap: 8px; align-items: center; width: 100%;">
+      <input type="text" id="excel-filter-input" placeholder="Lọc cột này..." />
+      <button class="clear-btn" id="excel-filter-clear" title="Xoá bộ lọc">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div id="excel-filter-dropdown" class="excel-filter-dropdown-list" style="display: none;"></div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="fabrication-status.js?v=1782944937"></script>
+  <!-- Idle manager: singleton tab lock + auto-logout after 60 min inactivity -->
+  <script src="idle-manager.js?v=1782944937"></script>
+  <!-- Hybrid read path: serve Dashboard + Testing Status from static precompute JSON
+       (+ DB-free live overlay), falling back to the API. Must load before app.js. -->
+  <script src="db-sqlite.js?v=1782944937"></script>
+  <script src="local-first.js?v=1782944937"></script>
+  <script src="app.js?v=1782944937"></script>
+  <!-- AI Assistant: ask-your-data (text-to-SQL over the local SQLite) -->
+  <script src="ai-assistant.js?v=1782944937"></script>
+</body>
+</html>
