@@ -1933,11 +1933,17 @@ async function exportToExcel(tableType, data) {
 function applyVirtualRepairResults(joints) {
   if (!Array.isArray(joints)) return joints;
   const parse = (jn) => {
+    // Correction generation so a later fix supersedes an earlier one (matches build_sqlite.py /
+    // etl_delta_sync.py): original 0 ; #R1/#RW/#RS 1 ; #R2/#RWR1/#RSR1 2. Reweld #RW and reshoot
+    // #RS count like repair #R (all suffixes start with '#R'); a bare #PWHT recheck stays its base.
     const s = String(jn == null ? '' : jn);
-    const m = s.match(/#R(\d+|S)/i);                 // #R1 / #R2 / #RS (RT reshoot)
-    if (!m) return { base: s, idx: 0 };
-    const tok = m[1].toUpperCase();
-    return { base: s.slice(0, m.index), idx: tok === 'S' ? 1 : parseInt(tok, 10) };  // #RS == #R1
+    const at = s.search(/#R/i);                      // first '#R' (all corrections start with it)
+    if (at < 0) return { base: s, idx: 0 };
+    const suf = s.slice(at + 1).toUpperCase().replace(/PWHT$/, '');   // e.g. R1, RW, RWR1, R2, RS
+    const rdig = (suf.match(/R\d+/g) || []).reduce((a, t) => a + parseInt(t.slice(1), 10), 0);
+    let idx = rdig + (suf.match(/[WS]/g) || []).length;
+    if (idx === 0 && suf !== '') idx = 1;
+    return { base: s.slice(0, at), idx };
   };
   const maxIdx = {};
   for (const j of joints) {
@@ -2150,7 +2156,7 @@ async function showTPDetailModal(p) {
     // RT/PAUT: show the RAW result, but flag a weld superseded by a repair (#R) with a
     // ↻ -- it reads REJ yet counts as ACC for %/Ready (matches the server rule).
     const repTag = (raw, virt) => (virt === 'ACC' && ['REJ', 'RS'].includes(String(raw || '').toUpperCase()))
-      ? ' <span title="Superseded by a repair/reshoot joint (#R/#RS) — counts as ACC for %/Ready" style="color:#22c55e;font-weight:800;">↻</span>' : '';
+      ? ' <span title="Superseded by a repair/reweld/reshoot joint (#R/#RW/#RS) — counts as ACC for %/Ready" style="color:#22c55e;font-weight:800;">↻</span>' : '';
     const rtPautCell = (st, raw, virt) => nm ? naMethodCell
       : `<td class="text-center"><span class="${getBadgeClass(st)}">${formatCell(st)}</span>${repTag(raw, virt)}</td>`;
     return `
