@@ -15,7 +15,7 @@
 
   var AI_URL = window.AI_API_URL ||
     'https://block-b-piping-fab.vercel.app/api/ai-query';
-  var ANALYZE_URL = AI_URL.replace(/\/api\/ai-query.*$/, '/api/ai-analyze');
+  var ANALYZE_URL = AI_URL;   // 2nd-pass analysis = same endpoint, distinguished by mode:'analyze'
   // Live Google-Sheet rows (inspector, test_plan, deadline, hydro...) loaded into the local
   // `testpack_sheet` table when the AI tab is USED: on the first query of a session, then
   // re-fetched at most every 3 HOURS and ONLY between 07:00-21:00 local time (to save calls).
@@ -268,7 +268,7 @@
         var cols = rows.length ? Object.keys(rows[0]) : [];
         return fetch(ANALYZE_URL, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ question: question, columns: cols, rows: rows, history: hist })
+          body: JSON.stringify({ mode: 'analyze', question: question, columns: cols, rows: rows, history: hist })
         }).then(function (r) { return r.json(); }).then(function (a) {
           setStatus('', '');
           if (a && a.answer) {
