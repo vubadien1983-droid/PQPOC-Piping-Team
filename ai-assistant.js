@@ -58,6 +58,21 @@
     var s = String(md == null ? '' : md).replace(/[*#`>_\-]/g, ' ').replace(/\s+/g, ' ').trim();
     return s.length > n ? s.slice(0, n) + '…' : s;
   }
+  // Inline SVG icons (outline, currentColor) so the tab matches the proposed mockup.
+  function svgIcon(inner, size) {
+    return '<svg class="ai-ic" viewBox="0 0 24 24" width="' + (size || 15) + '" height="' + (size || 15) +
+      '" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + inner + '</svg>';
+  }
+  var IC = {
+    plus: function (s) { return svgIcon('<path d="M12 5v14M5 12h14"/>', s); },
+    clock: function (s) { return svgIcon('<circle cx="12" cy="12" r="9"/><path d="M12 8v4l2.5 1.5"/>', s); },
+    refresh: function (s) { return svgIcon('<path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v5h-5"/>', s); },
+    send: function (s) { return svgIcon('<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/>', s); },
+    table: function (s) { return svgIcon('<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/>', s); },
+    arrow: function (s) { return svgIcon('<path d="M5 12h14M13 6l6 6-6 6"/>', s); },
+    message: function (s) { return svgIcon('<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>', s); },
+    download: function (s) { return svgIcon('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>', s); }
+  };
   function isSafeSelect(sql) {
     if (!sql) return false;
     var s = sql.replace(/--[^\n]*/g, ' ').replace(/\/\*[\s\S]*?\*\//g, ' ').trim().replace(/;\s*$/, '');
@@ -198,7 +213,7 @@
       .catch(function (e) { return { kind: 'error', error: 'Không gọi được AI: ' + (e && e.message ? e.message : e) }; });
   }
 
-  function setBusy(b) { state.busy = b; var btn = el('ai-ask-btn'); if (btn) { btn.disabled = b; btn.textContent = b ? 'Đang xử lý…' : 'Hỏi AI'; } }
+  function setBusy(b) { state.busy = b; var btn = el('ai-ask-btn'); if (btn) { btn.disabled = b; btn.innerHTML = b ? '<span class="ai-spin"></span>' : IC.send(17); } }
 
   function ask(question) {
     question = (question || '').trim();
@@ -285,17 +300,17 @@
           '<div class="ai-msg-meta">' + fmtTime(m.ts) + '</div></div>';
       }
       var sel = m.id === state.selectedId ? ' ai-msg-selected' : '';
-      var body, hint = '', canUpdate = false;
+      var body, hintText = '', hintIcon = '', canUpdate = false;
       if (m._updating || m.kind === 'pending') { body = '<span class="ai-spin"></span> Đang phân tích…'; }
       else if (m.kind === 'error') { body = '<span class="ai-err">' + escapeHtml(m.error || 'Lỗi') + '</span>'; }
-      else if (m.kind === 'answer') { body = escapeHtml(snippet(m.narrative, 170)); hint = 'xem đầy đủ'; canUpdate = true; }
-      else if (m.kind === 'analysis') { body = escapeHtml(snippet(m.narrative, 170)); hint = (m.rows ? m.rows.length : 0) + ' dòng · phân tích · xem'; canUpdate = true; }
-      else { body = escapeHtml(m.text || 'Kết quả'); hint = (m.rows ? m.rows.length : 0) + ' dòng · xem kết quả'; canUpdate = true; }
-      var meta = '<div class="ai-msg-meta"><span title="Thời điểm trích xuất dữ liệu">⏱ ' + fmtTime(m.extractedAt || m.ts) + '</span>' +
-        (canUpdate ? '<span class="ai-msg-update" data-update="' + m.id + '" title="Chạy lại trên dữ liệu hiện tại">↻ Cập nhật</span>' : '') + '</div>';
+      else if (m.kind === 'answer') { body = escapeHtml(snippet(m.narrative, 170)); hintText = 'xem đầy đủ'; hintIcon = IC.message(13); canUpdate = true; }
+      else if (m.kind === 'analysis') { body = escapeHtml(snippet(m.narrative, 170)); hintText = (m.rows ? m.rows.length : 0) + ' dòng · phân tích · xem'; hintIcon = IC.table(13); canUpdate = true; }
+      else { body = escapeHtml(m.text || 'Kết quả'); hintText = (m.rows ? m.rows.length : 0) + ' dòng · xem kết quả'; hintIcon = IC.table(13); canUpdate = true; }
+      var hint = hintText ? '<div class="ai-bubble-hint">' + hintIcon + '<span>' + escapeHtml(hintText) + '</span>' + IC.arrow(13) + '</div>' : '';
+      var meta = '<div class="ai-msg-meta"><span class="ai-mt" title="Thời điểm trích xuất dữ liệu">' + IC.clock(12) + ' ' + fmtTime(m.extractedAt || m.ts) + '</span>' +
+        (canUpdate ? '<span class="ai-msg-update" data-update="' + m.id + '" title="Chạy lại trên dữ liệu hiện tại">' + IC.refresh(12) + ' Cập nhật</span>' : '') + '</div>';
       return '<div class="ai-msg ai-msg-ai' + sel + '">' +
-        '<div class="ai-bubble" data-msg="' + m.id + '">' + body +
-        (hint ? '<div class="ai-bubble-hint">' + escapeHtml(hint) + ' →</div>' : '') + '</div>' + meta + '</div>';
+        '<div class="ai-bubble" data-msg="' + m.id + '">' + body + hint + '</div>' + meta + '</div>';
     }).join('');
   }
 
@@ -309,9 +324,9 @@
     if (msg._updating || msg.kind === 'pending') { out.innerHTML = '<div class="ai-output-empty"><span class="ai-spin"></span> Đang xử lý…</div>'; return; }
     var rows = msg.rows, hasRows = Array.isArray(rows);
     var head = '<div class="ai-output-head"><span class="ai-output-title">Kết quả</span>' +
-      '<span class="ai-extracted" title="Thời điểm trích xuất dữ liệu">⏱ trích xuất ' + fmtTime(msg.extractedAt || msg.ts) + '</span>';
-    if (msg.kind === 'table' || msg.kind === 'analysis' || msg.kind === 'answer') head += '<button class="ai-mini" data-update="' + msg.id + '" title="Chạy lại trên dữ liệu hiện tại">↻ Cập nhật</button>';
-    if (hasRows) head += '<button class="ai-mini" id="ai-export-btn">⬇ Export</button>';
+      '<span class="ai-extracted" title="Thời điểm trích xuất dữ liệu">' + IC.clock(13) + ' trích xuất ' + fmtTime(msg.extractedAt || msg.ts) + '</span>';
+    if (msg.kind === 'table' || msg.kind === 'analysis' || msg.kind === 'answer') head += '<button class="ai-mini" data-update="' + msg.id + '" title="Chạy lại trên dữ liệu hiện tại">' + IC.refresh(13) + ' Cập nhật</button>';
+    if (hasRows) head += '<button class="ai-mini" id="ai-export-btn">' + IC.download(13) + ' Export</button>';
     if (msg.sql) head += '<button class="ai-mini" id="ai-sql-toggle">Xem SQL</button>';
     head += '</div>';
     var body = '';
@@ -332,6 +347,12 @@
   function init() {
     var askBtn = el('ai-ask-btn'), input = el('ai-question'), examples = el('ai-examples');
     var thread = el('ai-thread'), history = el('ai-history-list'), output = el('ai-output'), newBtn = el('ai-newchat');
+
+    if (newBtn) newBtn.innerHTML = IC.plus(15) + ' Cuộc trò chuyện mới';
+    var chatHead = document.querySelector('.ai-chat-head');
+    if (chatHead && !chatHead.querySelector('.ai-ic')) chatHead.insertAdjacentHTML('afterbegin', IC.message(15) + ' ');
+    if (askBtn) { askBtn.className = 'ai-send'; askBtn.title = 'Hỏi AI (Ctrl+Enter)'; askBtn.setAttribute('aria-label', 'Hỏi AI'); }
+    setBusy(false);
 
     if (askBtn) askBtn.addEventListener('click', function () { ask(input && input.value); });
     if (input) input.addEventListener('keydown', function (e) { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); ask(input.value); } });
