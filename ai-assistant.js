@@ -78,7 +78,8 @@
     var s = sql.replace(/--[^\n]*/g, ' ').replace(/\/\*[\s\S]*?\*\//g, ' ').trim().replace(/;\s*$/, '');
     if (s.indexOf(';') >= 0) return false;
     if (!/^(select|with)\b/i.test(s)) return false;
-    if (/\b(insert|update|delete|drop|alter|attach|detach|pragma|replace|create|reindex|vacuum)\b/i.test(s)) return false;
+    if (/\breplace\s+into\b/i.test(s)) return false;   // block REPLACE INTO (upsert) but ALLOW the REPLACE() string function
+    if (/\b(insert|update|delete|drop|alter|attach|detach|pragma|create|reindex|vacuum)\b/i.test(s)) return false;
     return true;
   }
   function errorText(data) {
