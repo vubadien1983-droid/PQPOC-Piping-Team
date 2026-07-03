@@ -2687,6 +2687,13 @@ input[type="number"]:focus {
   border-bottom: 1px solid rgba(255,255,255,0.12);
 }
 .ai-result-table td { padding: 0.45rem 0.7rem; border-bottom: 1px solid rgba(255,255,255,0.05); color: var(--text-base); white-space: nowrap; }
+/* Resizable columns (drag the header border) + multi-line pending-note cells */
+.ai-result-table { table-layout: fixed; width: auto; min-width: 100%; }
+.ai-result-table th { overflow: hidden; text-overflow: ellipsis; }
+.ai-result-table td { overflow: hidden; text-overflow: ellipsis; }
+.ai-result-table td.ai-cell-wrap { white-space: normal; word-break: break-word; overflow: visible; text-overflow: clip; line-height: 1.55; }
+.ai-col-resize { position: absolute; top: 0; right: 0; width: 6px; height: 100%; cursor: col-resize; z-index: 3; }
+.ai-col-resize:hover { background: rgba(14,165,233,0.6); }
 
 /* ===== AI Assistant chat app: History rail | Chat thread | Result pane ===== */
 .ai-shell { display: flex; gap: 10px; flex: 1; min-height: 0; margin-top: 0.6rem; }

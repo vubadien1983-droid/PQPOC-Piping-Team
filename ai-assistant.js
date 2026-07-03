@@ -113,15 +113,47 @@
     closeList();
     return html;
   }
+  // Format a cell. Multi-line "pending note" values (Drawing | JointNo | Comp1 | Comp2 per line)
+  // are shown one item per line with the '(blank)' placeholders removed.
+  function fmtCell(v) {
+    if (v === null || v === undefined || (typeof v === 'number' && isNaN(v))) return { html: '', multi: false };
+    var s = String(v);
+    if (s.indexOf('\n') >= 0 || /\(blank\)/i.test(s)) {
+      s = s.replace(/\s*\|\s*\(blank\)/gi, '').replace(/[ \t]+$/gm, '');   // drop "| (blank)" parts
+      return { html: escapeHtml(s).replace(/\r?\n/g, '<br>'), multi: true };
+    }
+    return { html: escapeHtml(s), multi: false };
+  }
   function renderTable(rows) {
     if (!rows || !rows.length) return '<div class="ai-empty">Không có dòng nào khớp yêu cầu.</div>';
     var cols = Object.keys(rows[0]);
-    var thead = '<tr><th>#</th>' + cols.map(function (c) { return '<th>' + escapeHtml(c) + '</th>'; }).join('') + '</tr>';
+    var multiCol = cols.map(function (c) { return rows.some(function (r) { var v = r[c]; return typeof v === 'string' && (v.indexOf('\n') >= 0 || /\(blank\)/i.test(v)); }); });
+    var colgroup = '<colgroup><col style="width:44px">' +
+      cols.map(function (c, ci) { return '<col style="width:' + (multiCol[ci] ? 360 : 150) + 'px">'; }).join('') + '</colgroup>';
+    var thead = '<tr><th>#<span class="ai-col-resize"></span></th>' +
+      cols.map(function (c) { return '<th>' + escapeHtml(c) + '<span class="ai-col-resize"></span></th>'; }).join('') + '</tr>';
     var body = rows.map(function (r, i) {
       return '<tr><td class="ai-idx">' + (i + 1) + '</td>' +
-        cols.map(function (c) { var v = r[c]; return '<td>' + escapeHtml(v === null || v === undefined || (typeof v === 'number' && isNaN(v)) ? '' : v) + '</td>'; }).join('') + '</tr>';
+        cols.map(function (c) { var f = fmtCell(r[c]); return '<td' + (f.multi ? ' class="ai-cell-wrap"' : '') + '>' + f.html + '</td>'; }).join('') + '</tr>';
     }).join('');
-    return '<div class="ai-table-scroll"><table class="ai-result-table"><thead>' + thead + '</thead><tbody>' + body + '</tbody></table></div>';
+    return '<div class="ai-table-scroll"><table class="ai-result-table">' + colgroup + '<thead>' + thead + '</thead><tbody>' + body + '</tbody></table></div>';
+  }
+  // Drag a column border to resize (adjusts the <col> width; table-layout:fixed honours it).
+  function wireColumnResize(container) {
+    var table = container.querySelector('.ai-result-table'); if (!table) return;
+    var colEls = table.querySelectorAll('colgroup col');
+    table.querySelectorAll('thead th').forEach(function (th, i) {
+      var handle = th.querySelector('.ai-col-resize'), colEl = colEls[i];
+      if (!handle || !colEl) return;
+      handle.addEventListener('mousedown', function (e) {
+        e.preventDefault(); e.stopPropagation();
+        var startX = e.clientX, startW = th.getBoundingClientRect().width;
+        function move(ev) { colEl.style.width = Math.max(44, startW + (ev.clientX - startX)) + 'px'; }
+        function up() { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); document.body.style.userSelect = ''; }
+        document.body.style.userSelect = 'none';
+        document.addEventListener('mousemove', move); document.addEventListener('mouseup', up);
+      });
+    });
   }
   function exportRows(rows) {
     if (!rows || !rows.length || typeof ExcelJS === 'undefined') { alert('Không có dữ liệu để export.'); return; }
@@ -336,6 +368,7 @@
     if (msg.sql) body += '<pre class="ai-sql" id="ai-sql-box" style="display:none;">' + escapeHtml(msg.sql) + '</pre>';
     if (hasRows) body += '<div class="ai-rowcount">' + rows.length + ' dòng' + (msg.model ? ' · ' + escapeHtml(msg.model) : '') + '</div>' + renderTable(rows);
     out.innerHTML = head + '<div class="ai-output-body">' + body + '</div>';
+    wireColumnResize(out);
   }
 
   function selectMessage(id) {
