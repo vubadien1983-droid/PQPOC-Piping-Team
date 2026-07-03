@@ -2639,7 +2639,37 @@ input[type="number"]:focus {
   font-size: 0.62rem; font-weight: 800; padding: 0.1rem 0.4rem; border-radius: 5px;
   text-transform: uppercase; letter-spacing: 0.05em; vertical-align: middle; margin-right: 0.3rem;
 }
-.ai-result-head { display: flex; align-items: center; gap: 0.7rem; }
+/* Expert narrative (Markdown) block for type "answer" + the 2-pass analysis. */
+.ai-answer-rich {
+  font-size: 0.9rem; color: #e2e8f0; line-height: 1.6;
+  background: rgba(14, 165, 233, 0.06); border: 1px solid rgba(14, 165, 233, 0.22);
+  border-radius: 10px; padding: 0.9rem 1.1rem; margin-bottom: 0.8rem;
+}
+.ai-answer-rich h3, .ai-answer-rich h4, .ai-answer-rich h5, .ai-answer-rich h6 {
+  margin: 0.85rem 0 0.35rem; font-size: 0.92rem; color: #7dd3fc; font-weight: 800;
+}
+.ai-answer-rich h3:first-child, .ai-answer-rich h4:first-child { margin-top: 0.2rem; }
+.ai-answer-rich p { margin: 0.4rem 0; }
+.ai-answer-rich ul, .ai-answer-rich ol { margin: 0.35rem 0 0.5rem 1.25rem; padding: 0; }
+.ai-answer-rich li { margin: 0.2rem 0; }
+.ai-answer-rich strong { color: #fff; }
+.ai-answer-rich em { color: #cbd5e1; }
+.ai-answer-rich code {
+  background: rgba(2,6,23,0.6); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px;
+  padding: 0.05rem 0.3rem; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.8rem; color: #a5b4fc;
+}
+.ai-answer-rich .ai-badge { margin-bottom: 0.45rem; }
+.ai-membar {
+  font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.55rem;
+  display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+}
+.ai-reset {
+  background: transparent; border: 1px solid rgba(255,255,255,0.18); color: var(--text-muted);
+  border-radius: 6px; padding: 0.15rem 0.5rem; font-size: 0.7rem; cursor: pointer;
+}
+.ai-reset:hover { color: #fff; border-color: rgba(255,255,255,0.4); }
+.ai-analyzing { color: #7dd3fc; font-size: 0.8rem; font-style: italic; }
+.ai-result-head { display: flex; align-items: center; gap: 0.7rem; margin-top: 0.2rem; }
 .ai-rowcount { font-size: 0.8rem; color: var(--text-muted); font-weight: 600; margin-right: auto; }
 .ai-sql-toggle { background: transparent; border: 1px solid rgba(255,255,255,0.15); color: var(--text-muted);
   border-radius: 6px; padding: 0.3rem 0.6rem; font-size: 0.72rem; cursor: pointer; }
