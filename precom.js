@@ -17,6 +17,7 @@
   var state = { system: '__ALL__', q: '', onlyPending: false, inited: false,
                 disciplines: [], sel: { type: 'all', ss: null, disc: null }, kpiSel: null };
   var _chart = null;
+  var _click = false;   // TRUE chi khi user vua click -> cho phep auto-cuon 1 lan (refresh 3' KHONG cuon)
 
   function el(id) { return document.getElementById(id); }
   function esc(v) { return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
@@ -64,7 +65,21 @@
     '.pcm-badge.no{background:#e2e8f0;color:#64748b;}' +
     // Layout: #precom-body CUON DOC ca trang; chart LON 420px; moi bang detail co
     // khung cuon rieng (.det-wrap) de header sticky hoat dong dung tung bang.
-    '#precom-body{overflow-y:auto!important;overflow-x:hidden;}' +
+    // MOT vung cuon duy nhat (#precom-body) - bang ma tran KHONG cuon rieng nua
+    // (2 vung cuon long nhau lam ket banh xe chuot, khong ve dau trang duoc).
+    '#precom-body{overflow-y:auto!important;overflow-x:auto;}' +
+    '#precom-body>.table-container{max-height:none!important;overflow:visible!important;}' +
+    // KPI chips: nho gon, moi so lieu = label + closed/total + % ben duoi
+    '#precom-kpis{display:flex!important;gap:6px;align-items:stretch;}' +
+    '#precom-kpis .pk-card{flex:1 1 0;background:#f7f9fb;border:1px solid #d9e0e9;border-radius:8px;padding:4px 6px;min-width:0;max-height:128px;overflow-y:auto;}' +
+    '#precom-kpis .pk-card.sel{box-shadow:0 0 0 2px #0369a1;}' +
+    '.pk-title{font-size:.62rem;font-weight:800;color:#40506a;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;display:flex;justify-content:space-between;gap:4px;position:sticky;top:0;background:#f7f9fb;padding-bottom:2px;}' +
+    '.pk-title .pk-sum{color:#0369a1;}' +
+    '.pk-grid{display:flex;flex-wrap:wrap;gap:3px;margin-top:2px;}' +
+    '.pk-chip{flex:1 0 62px;max-width:96px;background:#fff;border:1px solid #e2e8f0;border-radius:5px;padding:2px 3px;text-align:center;}' +
+    '.pk-chip .l{font-size:.52rem;font-weight:700;color:#5b6b80;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
+    '.pk-chip .f{font-size:.62rem;font-weight:800;color:#17233b;white-space:nowrap;}' +
+    '.pk-chip .p{font-size:.56rem;font-weight:800;}' +
     '#precom-chart-wrap{flex:0 0 auto;height:420px;min-height:420px;position:relative;border-top:1px solid #d3dae3;padding:4px;background:#f7f9fb;border-radius:6px;margin-top:6px;}' +
     '#precom-detail{flex:0 0 auto;background:#fdfdfe;border:1px solid #d3dae3;border-radius:6px;margin-top:6px;padding:4px 8px;}' +
     '#precom-detail h3{font-size:.72rem;color:#17233b;margin:6px 0 3px;display:flex;align-items:center;gap:8px;}' +
@@ -179,13 +194,32 @@
     var clr = el('precom-clear-btn');
     if (clr) clr.style.display = hasFilter() ? '' : 'none';
 
+    // ---- 4 khoi KPI dang CHIP (nho gon, moi so lieu = Closed/Total + % duoi) --------
+    var discs2 = state.disciplines;
+    // ITR-A done/total + DAC theo tung discipline (tu list DA loc)
+    var dAgg = {};
+    discs2.forEach(function (d) { dAgg[d] = { done: 0, tot: 0, dacN: 0, cellN: 0 }; });
+    list.forEach(function (g) {
+      discs2.forEach(function (d) {
+        var r = g.disc[d]; if (!r) return;
+        var a = dAgg[d];
+        a.done += r.itr_done; a.tot += r.itr_total;
+        if (r.itr_total || r.pa_t || r.pb_t) { a.cellN += 1; a.dacN += r.dac; }
+      });
+    });
+    var ph = punchByPhase();   // Punch A/B x Phase (FAT/OSD/CON/PRE) tu punch_list
+
     el('precom-kpis').innerHTML =
-      kpi('ITR-A Done', don.toLocaleString() + ' / ' + tot.toLocaleString(), pct(don, tot), '#0369a1', 'itr') +
-      kpi('Punch A Closed', paT ? ((paT - paO).toLocaleString() + ' / ' + paT.toLocaleString()) : 'Chưa có dữ liệu', paT ? pct(paT - paO, paT) : 0, '#dc2626', 'pa') +
-      kpi('DAC (Discipline Ready)', dacN + ' / ' + dacT, pct(dacN, dacT), '#7c3aed', 'dac') +
-      kpi('CSSC (Subsystem)', csscN + ' / ' + list.length, pct(csscN, list.length), '#059669', 'cssc');
+      kpiCard('itr', 'ITR-A Done', don, tot, '#0369a1',
+        discs2.filter(function (d) { return dAgg[d].tot; })
+              .map(function (d) { return chip(shortDisc(d), dAgg[d].done, dAgg[d].tot); })) +
+      kpiCard('pa', 'Punch Status', ph.totClosed, ph.tot, '#dc2626', ph.chips) +
+      kpiCard('dac', 'DAC (Discipline)', dacN, dacT,'#7c3aed',
+        discs2.filter(function (d) { return dAgg[d].cellN; })
+              .map(function (d) { return chip(shortDisc(d), dAgg[d].dacN, dAgg[d].cellN); })) +
+      kpiCard('cssc', 'CSSC (Subsystem)', csscN, list.length, '#059669', csscBySystem(list));
     el('precom-kpis').querySelectorAll('[data-kpi]').forEach(function (card) {
-      card.onclick = function () { state.kpiSel = card.getAttribute('data-kpi'); state.sel = { type: 'all' }; render(); };
+      card.onclick = function () { _click = true; state.kpiSel = card.getAttribute('data-kpi'); state.sel = { type: 'all' }; render(); };
     });
 
     var discs = state.disciplines;   // bang chinh LUON hien du cac discipline
@@ -236,7 +270,7 @@
 
     el('precom-body').innerHTML =
       '<div class="pcm-hint">Click ô discipline / tên subsystem để LỌC bảng + xem biểu đồ · Double-click: danh sách tag · Ô xanh = đạt DAC · Nút "Xoá lọc" để hiện lại tất cả</div>' +
-      '<div class="table-container" style="flex:0 0 auto;max-height:56vh;overflow:auto;min-height:120px;">' +
+      '<div class="table-container" style="flex:0 0 auto;min-height:120px;">' +
       '<table><thead>' + thead + '</thead><tbody>' +
       (html || '<tr><td colspan="' + nCols + '" class="text-center" style="padding:2rem;">Không có subsystem nào khớp bộ lọc.</td></tr>') +
       '</tbody></table></div>' +
@@ -244,23 +278,25 @@
       '<div id="precom-chart-wrap"><canvas id="precom-chart"></canvas></div>';
 
     el('precom-body').querySelectorAll('td[data-ss][data-disc]').forEach(function (td) {
-      td.onclick = function () { state.kpiSel = null; state.sel = { type: 'cell', ss: td.getAttribute('data-ss'), disc: td.getAttribute('data-disc') }; render(); };
+      td.onclick = function () { _click = true; state.kpiSel = null; state.sel = { type: 'cell', ss: td.getAttribute('data-ss'), disc: td.getAttribute('data-disc') }; render(); };
       td.ondblclick = function () { showDetail(td.getAttribute('data-ss'), td.getAttribute('data-disc')); };
     });
     el('precom-body').querySelectorAll('[data-ssname]').forEach(function (td) {
-      td.onclick = function () { state.kpiSel = null; state.sel = { type: 'ss', ss: td.getAttribute('data-ssname') }; render(); };
+      td.onclick = function () { _click = true; state.kpiSel = null; state.sel = { type: 'ss', ss: td.getAttribute('data-ssname') }; render(); };
       td.ondblclick = function () { showDetail(td.getAttribute('data-ssname'), null); };
     });
 
     renderDetail();
     renderChart();
-    // Cuon detail vao tam nhin khi user vua chon (bang chinh giu nguyen, chart van o duoi)
-    if (state.kpiSel || state.sel.type !== 'all') {
+    // Auto-cuon detail vao tam nhin CHI khi user vua CLICK (refresh 3' KHONG cuon ->
+    // fix bug "cuon xuong roi khong ve dau trang duoc").
+    if (_click && (state.kpiSel || state.sel.type !== 'all')) {
       var det = el('precom-detail');
       if (det && det.style.display !== 'none') {
         try { det.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {}
       }
     }
+    _click = false;
   }
 
   // ---- PREVIEW DETAIL: click o/subsystem -> bang chi tiet tu DU LIEU NGUON -------
@@ -296,7 +332,7 @@
     var d = detailQueries();          // theo bo loc system hien tai (sel = all)
     var day = function (v) { return esc(String(v || '').slice(0, 10)); };
     var list = loadRows();
-    var title = { itr: 'ITR-A Checksheets', pa: 'Punch Category A', dac: 'DAC theo Subsystem × Discipline', cssc: 'CSSC theo Subsystem' }[state.kpiSel];
+    var title = { itr: 'ITR-A Checksheets', pa: 'Punch Status (Cat A & B theo Phase)', dac: 'DAC theo Subsystem × Discipline', cssc: 'CSSC theo Subsystem' }[state.kpiSel];
     var html = '<h3>Chi tiết KPI: ' + title +
       ' <button class="pcm-det-btn" id="precom-det-export">Export detail Excel</button></h3>';
 
@@ -310,13 +346,19 @@
             '<td>' + (done ? day(r.complete_date) : 'PENDING') + '</td></tr>';
         }), 800);
     } else if (state.kpiSel === 'pa') {
-      var pa = d.pun.filter(function (r) { return String(r.category || '').trim().toUpperCase() === 'A'; });
-      html += tableHtml(['#', 'Subsystem', 'PunchNo', 'Status', 'Disc', 'TagNo', 'Defect Description', 'ActionBy', 'Open', 'Closed'],
-        pa.map(function (r, i) {
+      var pab = d.pun.filter(function (r) {
+        var c = String(r.category || '').trim().toUpperCase(); return c === 'A' || c === 'B';
+      }).sort(function (a, b) {
+        return String(a.category || '').toUpperCase().localeCompare(String(b.category || '').toUpperCase()) ||
+               String(a.phase || '').toUpperCase().localeCompare(String(b.phase || '').toUpperCase());
+      });
+      html += tableHtml(['#', 'Subsystem', 'PunchNo', 'Cat', 'Phase', 'Status', 'Disc', 'TagNo', 'Defect Description', 'ActionBy', 'Open', 'Closed'],
+        pab.map(function (r, i) {
           var closed = String(r.status || '').trim().toUpperCase() === 'CLOSED';
           return '<tr class="' + (closed ? 'done' : 'opa') + '"><td>' + (i + 1) + '</td><td>' + esc(ssShort(r.subsystem)) + '</td>' +
-            '<td><b>' + esc(r.punch_no) + '</b></td><td>' + esc(r.status) + '</td><td>' + esc(r.discipline) + '</td>' +
-            '<td>' + esc(r.tag_no) + '</td><td style="max-width:360px;white-space:normal;">' + esc(String(r.description || '').slice(0, 200)) + '</td>' +
+            '<td><b>' + esc(r.punch_no) + '</b></td><td style="text-align:center;font-weight:800;">' + esc(r.category) + '</td>' +
+            '<td>' + esc(r.phase) + '</td><td>' + esc(r.status) + '</td><td>' + esc(r.discipline) + '</td>' +
+            '<td>' + esc(r.tag_no) + '</td><td style="max-width:340px;white-space:normal;">' + esc(String(r.description || '').slice(0, 200)) + '</td>' +
             '<td>' + esc(r.action_by) + '</td><td>' + day(r.open_date) + '</td><td>' + day(r.closed_date) + '</td></tr>';
         }), 800);
     } else if (state.kpiSel === 'dac') {
@@ -419,13 +461,69 @@
     });
   }
 
-  function kpi(label, frac, p, color, key) {
-    var selCls = (state.kpiSel === key) ? 'box-shadow:0 0 0 2px ' + color + ';' : '';
-    return '<div class="stat-card" data-kpi="' + key + '" style="cursor:pointer;' + selCls + '" title="Click: xem danh sách chi tiết bên dưới">' +
-      '<span class="stat-card-label">' + esc(label) + '</span>' +
-      '<div class="stat-card-main"><span class="stat-frac">' + frac + '</span>' +
-      '<span class="stat-pct">' + p + '%</span></div>' +
-      '<div class="stat-bar"><div class="stat-bar-fill" style="width:' + p + '%;background:' + color + '"></div></div></div>';
+  // ---- KPI dang CHIP: 1 card = tieu de (label + tong Closed/Total + %) + luoi chip ----
+  function shortDisc(d) {
+    d = String(d || '').toUpperCase();
+    var m = { MECHANICAL: 'MECH', ELECTRICAL: 'ELEC', INSTRUMENT: 'INST', STRUCTURE: 'STRU',
+              ARCHITECTURE: 'ARCH', TELECOM: 'TELE', PIPING: 'PIPE', SAFETY: 'SAFE' };
+    return m[d] || d.slice(0, 4);
+  }
+  function chip(label, closed, total) {
+    var p = pct(closed, total);
+    return '<div class="pk-chip" title="' + esc(label) + ': ' + closed + '/' + total + '">' +
+      '<div class="l">' + esc(label) + '</div>' +
+      '<div class="f">' + closed.toLocaleString() + '/' + total.toLocaleString() + '</div>' +
+      '<div class="p ' + pctCls(p) + '">' + p + '%</div></div>';
+  }
+  function kpiCard(key, label, closed, total, color, chips) {
+    var p = pct(closed, total), selCls = (state.kpiSel === key) ? ' sel' : '';
+    var body = (chips && chips.length) ? chips.join('') :
+      '<div class="pk-chip" style="flex:1 0 100%;"><div class="l">Chưa có dữ liệu</div></div>';
+    return '<div class="pk-card' + selCls + '" data-kpi="' + key + '" style="cursor:pointer;" ' +
+      'title="Click: xem danh sách chi tiết bên dưới">' +
+      '<div class="pk-title"><span style="border-left:3px solid ' + color + ';padding-left:4px;">' + esc(label) + '</span>' +
+      '<span class="pk-sum">' + closed.toLocaleString() + '/' + total.toLocaleString() + ' · ' + p + '%</span></div>' +
+      '<div class="pk-grid">' + body + '</div></div>';
+  }
+  // Punch A & B tach theo cot Phase (FAT/OSD/CON/PRE) - query truc tiep punch_list.
+  function punchByPhase() {
+    var PH = ['FAT', 'OSD', 'CON', 'PRE'];
+    var out = { chips: [], tot: 0, totClosed: 0 };
+    var rows;
+    try {
+      var w = '', p = [];
+      if (state.system !== '__ALL__') { w = ' AND system_no=?'; p.push(state.system); }
+      rows = window.PrecomDB.query(
+        "SELECT UPPER(TRIM(COALESCE(phase,''))) ph, UPPER(TRIM(COALESCE(category,''))) cat," +
+        " COUNT(*) t, SUM(CASE WHEN UPPER(TRIM(status))='CLOSED' THEN 1 ELSE 0 END) c" +
+        " FROM punch_list WHERE 1=1" + w + " GROUP BY ph, cat", p);
+    } catch (e) { return out; }   // chua co du lieu punch
+    var map = {}, seen = {};
+    rows.forEach(function (r) {
+      var cat = r.cat || '?', pk = r.ph || 'N/A';
+      if (cat !== 'A' && cat !== 'B') return;          // user chot: chi A & B
+      (map[cat] || (map[cat] = {}))[pk] = { t: r.t, c: r.c };
+      seen[pk] = 1; out.tot += r.t; out.totClosed += r.c;
+    });
+    var order = PH.filter(function (x) { return seen[x]; })
+      .concat(Object.keys(seen).filter(function (x) { return PH.indexOf(x) < 0; }).sort());
+    ['A', 'B'].forEach(function (cat) {
+      if (!map[cat]) return;
+      order.forEach(function (pk) {
+        var v = map[cat][pk]; if (!v) return;
+        out.chips.push(chip(cat + '·' + pk, v.c, v.t));
+      });
+    });
+    return out;
+  }
+  // CSSC: so subsystem dat CSSC / tong subsystem theo tung system.
+  function csscBySystem(list) {
+    var bySys = {};
+    list.forEach(function (g) {
+      var s = g.system || '?', a = bySys[s] || (bySys[s] = { c: 0, t: 0 });
+      a.t += 1; a.c += g.cssc;
+    });
+    return Object.keys(bySys).sort().map(function (s) { return chip(ssShort(s), bySys[s].c, bySys[s].t); });
   }
 
   // ---- Chart: truc thoi gian LIEN TUC ------------------------------------------------
