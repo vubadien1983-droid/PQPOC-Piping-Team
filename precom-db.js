@@ -17,7 +17,7 @@
   var IDB_NAME = 'precom-local-db', IDB_STORE = 'kv';
   var KEY_BYTES = 'db_gz', KEY_ETAG = 'db_etag';
 
-  var _db = null, _meta = null, _ready = null;
+  var _db = null, _meta = null, _ready = null, _SQLmod = null;
 
   function _idb() {
     return new Promise(function (res, rej) {
@@ -76,7 +76,7 @@
   function _init() {
     var SQL;
     return _ensureSQL().then(function (S) {
-      SQL = S;
+      SQL = S; _SQLmod = S;
       return Promise.all([_get(KEY_BYTES), _get(KEY_ETAG)]);
     }).then(function (c) {
       var bytes = c[0], etag = c[1];
@@ -113,6 +113,24 @@
       try { if (params) st.bind(params); var out = []; while (st.step()) out.push(st.getAsObject()); return out; }
       finally { st.free(); }
     },
-    meta: function () { return _meta || {}; }
+    meta: function () { return _meta || {}; },
+    // Revalidate bang ETag (304 = khong doi). Goi dinh ky de app dang mo tu nhan
+    // du lieu moi sau khi tool Update_ITRA/Punch push GitHub - khong can F5.
+    refresh: function () {
+      if (!_db || !_SQLmod) return Promise.resolve();
+      return _get(KEY_ETAG).then(function (etag) {
+        return _download(etag ? { 'If-None-Match': etag } : {}).then(function (r) {
+          if (!r || r.status === 304) return;
+          return Promise.all([_set(KEY_BYTES, r.bytes), r.etag ? _set(KEY_ETAG, r.etag) : null]).then(function () {
+            _loadDB(_SQLmod, r.bytes);
+            try { window.dispatchEvent(new Event('precomdb-updated')); } catch (e) {}
+          });
+        });
+      }).catch(function () { /* offline/transient -> giu du lieu hien tai */ });
+    }
   };
+
+  setInterval(function () {
+    if (_db) { try { window.PrecomDB.refresh(); } catch (e) {} }
+  }, 180000);
 })();
