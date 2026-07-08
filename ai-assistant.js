@@ -220,7 +220,13 @@
   }
 
   // ---- Query pipeline ---------------------------------------------------------------------
+  // Bang thuoc mang PRECOM (ITR-A/Punch/DAC/CSSC) nam trong DB thu 2 (PrecomDB, lazy).
+  // SQL cham den chung -> chay tren PrecomDB; con lai chay tren LocalDB (fabrication).
+  var PRECOM_RE = /\b(precom_summary|itr_a|punch_list|tag_status|itr_daily|plan_daily)\b/i;
   function runLocalSql(sql) {
+    if (PRECOM_RE.test(sql) && window.PrecomDB) {
+      return window.PrecomDB.ready().then(function () { return window.PrecomDB.query(sql); });
+    }
     return Promise.resolve(window.LocalDB.ready ? window.LocalDB.ready() : null)
       .then(function () { return ensureSheetData(); })
       .then(function () { if (/testpack_sheet/i.test(sql) && !sheetHasRows()) return ensureSheetData(true); })

@@ -2427,6 +2427,7 @@ function initTabs() {
     { btn: 'tab-fab-view', container: 'fab-view-container', name: 'fab-view' },
     { btn: 'tab-database-view', container: 'database-view-container', name: 'database-view' },
     { btn: 'tab-testingdata-view', container: 'testingdata-view-container', name: 'testingdata-view' },
+    { btn: 'tab-precom-view', container: 'precom-view-container', name: 'precom-view' },
     { btn: 'tab-ai-view', container: 'ai-view-container', name: 'ai-view' }
   ];
 
@@ -2458,6 +2459,10 @@ function initTabs() {
         // System Detailed load on demand via /api/joints. (Removed a legacy
         // Firebase fetch that parsed a big blob and rendered nothing.)
         initResizablePanels();
+      }
+      if (tab.name === 'precom-view' && window.PrecomInit) {
+        // Precom (ITR-A/Punch): DB thu 2 tai LAZY o lan mo dau tien (precom.js).
+        window.PrecomInit();
       }
       if (tab.name === 'testingdata-view') {
         // Embedded live Google Sheet -- lazy-load only when first opened (it's a

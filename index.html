@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="style.css?v=1783305778">
+  <link rel="stylesheet" href="style.css?v=1783480378">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -21,7 +21,6 @@
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
   <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
-  <script>window.SQLITE_DB_URL="https://raw.githubusercontent.com/vubadien1983-droid/piping-data/main/piping_data.db.gz";</script>
   <script>if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{updateViaCache:"none"}).catch(function(){});});}</script>
 </head>
 <body>
@@ -75,6 +74,13 @@
             <path d="M3 9h18M3 15h18M9 3v18M15 3v18"></path>
           </svg>
           Testing Data
+        </button>
+        <button class="tab-btn" id="tab-precom-view">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="tab-icon">
+            <path d="M9 11l3 3L22 4"></path>
+            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+          </svg>
+          Precom
         </button>
         <button class="tab-btn" id="tab-ai-view">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="tab-icon">
@@ -379,6 +385,18 @@
         </div>
       </section>
 
+      <!-- ZONE PRECOM: overview ITR-A / Punch A / DAC / CSSC (du lieu nap nen tu PrecomDB;
+           click de mo tab Precom). Cac zone khac tu co lai nho flex. -->
+      <section class="dash-zone card" id="zone-precom-ov" style="flex:1 1 220px; min-width:240px; cursor:pointer;" title="Click để mở tab Precom">
+        <div class="dash-zone-header">
+          <span class="dash-zone-tag tag-teal">Precom</span>
+          <h2>Precom Handover</h2>
+        </div>
+        <div class="dash-zone-body" id="precom-ov-body" style="display:flex; flex-direction:column; gap:0.45rem;">
+          <span class="stat-card-sub" style="font-style:italic;">Đang tải dữ liệu Precom…</span>
+        </div>
+      </section>
+
       </div><!-- /.dash-top-row -->
 
       <!-- ZONE 3: Interactive Line Chart -->
@@ -487,6 +505,29 @@
               style="width:100%; height:100%; border:0; border-radius:8px; background:#fff;"></iframe>
     </div>
 
+    <!-- Tab Precom: ITR-A Checksheet handover status (System/Subsystem x Discipline).
+         DB thu 2 (precom_data.db.gz) chi tai LAZY khi mo tab nay - khong anh huong app cu. -->
+    <div id="precom-view-container" class="tab-content" style="display: none; flex-direction: column; gap: 0.7rem; height: calc(100% - 55px); overflow: hidden; width: 100%;">
+      <section class="dash-zone card" style="display:flex; flex-direction:column; flex:1; min-height:0; overflow:hidden;">
+        <div class="dash-zone-header">
+          <span class="dash-zone-tag tag-purple">Precom</span>
+          <h2>Precom Handover — ITR-A Checksheet Status</h2>
+          <div style="display:flex; align-items:center; gap:0.5rem; margin-left:auto; flex-wrap:wrap;">
+            <select id="precom-system-filter" style="background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.1); border-radius:6px; color:var(--text-main); padding:0.3rem 0.5rem; font-size:0.72rem; outline:none;"></select>
+            <input type="text" id="precom-search" placeholder="Lọc subsystem..." style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:6px; color:var(--text-main); padding:0.3rem 0.5rem; font-size:0.72rem; outline:none; width:150px;">
+            <label style="display:flex; align-items:center; gap:0.3rem; font-size:0.7rem; color:var(--text-muted); cursor:pointer;">
+              <input type="checkbox" id="precom-pending-toggle"> Chỉ chưa xong
+            </label>
+            <button class="btn btn-secondary" id="precom-clear-btn" style="display:none; padding:0.3rem 0.6rem; font-size:0.7rem; min-height:auto; border-color:rgba(244,63,94,0.4); color:#e11d48;" title="Bỏ tất cả bộ lọc + lựa chọn">Xoá lọc</button>
+            <button class="btn btn-secondary" id="precom-export-btn" style="padding:0.3rem 0.6rem; font-size:0.7rem; min-height:auto;" title="Export theo phạm vi đang chọn (system/subsystem/discipline)">Export lựa chọn</button>
+            <button class="btn btn-primary" id="precom-export-all-btn" style="padding:0.3rem 0.6rem; font-size:0.7rem; min-height:auto;" title="Export toàn bộ dữ liệu + summary DAC/CSSC">Export All</button>
+          </div>
+        </div>
+        <div class="dash-zone-body zone1-grid" id="precom-kpis" style="flex:0 0 auto; grid-template-columns:repeat(4,1fr);"></div>
+        <div id="precom-body" style="display:flex; flex-direction:column; flex:1; min-height:0; overflow-y:auto;"></div>
+      </section>
+    </div>
+
     <!-- Tab 5: AI Assistant — ask-your-data (NotebookLM-style text-to-SQL over the local DB) -->
     <div id="ai-view-container" class="tab-content" style="display: none; flex-direction: column; height: calc(100% - 55px); overflow: hidden; width: 100%;">
       <section class="dash-zone card" id="zone-ai" style="display:flex; flex-direction:column; flex:1; min-height:0; overflow:hidden;">
@@ -561,15 +602,28 @@
   </div>
 
   <!-- Scripts -->
-  <script src="fabrication-status.js?v=1783305778"></script>
+  <script src="fabrication-status.js?v=1783480378"></script>
   <!-- Idle manager: singleton tab lock + auto-logout after 60 min inactivity -->
-  <script src="idle-manager.js?v=1783305778"></script>
-  <!-- Hybrid read path: serve Dashboard + Testing Status from static precompute JSON
-       (+ DB-free live overlay), falling back to the API. Must load before app.js. -->
-  <script src="db-sqlite.js?v=1783305778"></script>
-  <script src="local-first.js?v=1783305778"></script>
-  <script src="app.js?v=1783305778"></script>
+  <script src="idle-manager.js?v=1783480378"></script>
+  <!-- PLAN A (Full Local-first): tải piping_data.db.gz từ GitHub về máy, chạy SQLite-WASM.
+       Khi chạy localhost, view=live/testpacks gọi server local (server.js) thay vì Vercel.
+       Bản hybrid cũ (precompute.js) đã đưa vào _quarantine. -->
+  <script>
+    if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+      // Test cục bộ: proxy Google Sheet chạy ngay trên server.js (Node >=18 có fetch).
+      window.LIVE_API_URL = '/api/dashboard-summary?view=live';
+      // AI vẫn gọi Vercel prod (nơi giữ GEMINI_API_KEY). Muốn test AI hoàn toàn local:
+      // đặt GEMINI_API_KEY vào env rồi bỏ dòng dưới.
+      window.AI_API_URL = 'https://block-b-piping-fab.vercel.app/api/ai-query';
+    }
+  </script>
+  <script src="db-sqlite.js?v=1783480378"></script>
+  <script src="local-first.js?v=1783480378"></script>
+  <script src="app.js?v=1783480378"></script>
+  <!-- Precom (ITR-A/Punch): DB thu 2, LAZY - chi tai khi mo tab Precom -->
+  <script src="precom-db.js?v=1783480378"></script>
+  <script src="precom.js?v=1783480378"></script>
   <!-- AI Assistant: ask-your-data (text-to-SQL over the local SQLite) -->
-  <script src="ai-assistant.js?v=1783305778"></script>
+  <script src="ai-assistant.js?v=1783480378"></script>
 </body>
 </html>
