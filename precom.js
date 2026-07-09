@@ -107,10 +107,13 @@
     '.pcm-kbox .kf{font-size:1.05rem;font-weight:800;color:#0f2647;}' +
     '.pcm-kbox .kp{font-size:.72rem;font-weight:800;}' +
     '.pcm-chartbox{background:#fff;border:1px solid #dbe2ea;border-radius:8px;padding:8px;height:320px;margin-bottom:14px;}' +
-    '.pcm-rpt{width:100%;border-collapse:collapse;background:#fff;margin:4px 0 18px;font-size:.7rem;box-shadow:0 1px 4px rgba(15,38,71,.1);}' +
+    '.pcm-rpt{width:100%;border-collapse:separate;border-spacing:0;background:#fff;margin:4px 0 18px;font-size:.7rem;box-shadow:0 1px 4px rgba(15,38,71,.1);}' +
     '.pcm-rpt caption{caption-side:top;text-align:left;font-weight:800;color:#0f2647;font-size:.82rem;padding:8px 2px 6px;}' +
     '.pcm-rpt thead th{position:sticky;top:0;background:#0f2647;color:#fff;font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em;padding:6px 8px;text-align:left;border:1px solid #24406b;z-index:2;}' +
     '.pcm-rpt tbody td{padding:4px 8px;border:1px solid #e2e8f0;color:#17233b;vertical-align:top;}' +
+    // Moi o du lieu 1 DONG (nowrap); rieng cot mo ta (inline white-space:normal) duoc thu nho + xuong dong
+    '.pcm-rpt th,.pcm-rpt td{white-space:nowrap;}' +
+    '.pcm-rpt td[style*="white-space:normal"]{max-width:260px;min-width:150px;word-break:break-word;}' +
     '.pcm-rpt tbody tr:nth-child(even) td{background:#f4f7fb;}' +
     '.pcm-rpt tbody tr.done td{background:#e6f6ec;}' +
     '.pcm-rpt tbody tr.opa td{background:#fdeaea;}' +
