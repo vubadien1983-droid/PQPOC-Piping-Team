@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="style.css?v=1783569607">
+  <link rel="stylesheet" href="style.css?v=1783581776">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -60,7 +60,7 @@
           </svg>
           Testing Status
         </button>
-        <button class="tab-btn" id="tab-database-view">
+        <button class="tab-btn" id="tab-database-view" style="display:none;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="tab-icon">
             <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
             <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
@@ -68,7 +68,7 @@
           </svg>
           Database
         </button>
-        <button class="tab-btn" id="tab-testingdata-view">
+        <button class="tab-btn" id="tab-testingdata-view" style="display:none;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="tab-icon">
             <rect x="3" y="3" width="18" height="18" rx="2"></rect>
             <path d="M3 9h18M3 15h18M9 3v18M15 3v18"></path>
@@ -512,6 +512,7 @@
         <div class="dash-zone-header">
           <span class="dash-zone-tag tag-purple">Precom</span>
           <h2>Precom Handover — ITR-A Checksheet Status</h2>
+          <div id="precom-disc-btns" style="display:flex; align-items:center; gap:0.3rem; flex-wrap:wrap; margin-left:0.9rem;"></div>
           <div style="display:flex; align-items:center; gap:0.5rem; margin-left:auto; flex-wrap:wrap;">
             <select id="precom-system-filter" style="background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.1); border-radius:6px; color:var(--text-main); padding:0.3rem 0.5rem; font-size:0.72rem; outline:none;"></select>
             <input type="text" id="precom-search" placeholder="Lọc subsystem..." style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:6px; color:var(--text-main); padding:0.3rem 0.5rem; font-size:0.72rem; outline:none; width:150px;">
@@ -602,9 +603,9 @@
   </div>
 
   <!-- Scripts -->
-  <script src="fabrication-status.js?v=1783569607"></script>
+  <script src="fabrication-status.js?v=1783581776"></script>
   <!-- Idle manager: singleton tab lock + auto-logout after 60 min inactivity -->
-  <script src="idle-manager.js?v=1783569607"></script>
+  <script src="idle-manager.js?v=1783581776"></script>
   <!-- PLAN A (Full Local-first): tải piping_data.db.gz từ GitHub về máy, chạy SQLite-WASM.
        Khi chạy localhost, view=live/testpacks gọi server local (server.js) thay vì Vercel.
        Bản hybrid cũ (precompute.js) đã đưa vào _quarantine. -->
@@ -617,13 +618,13 @@
       window.AI_API_URL = 'https://block-b-piping-fab.vercel.app/api/ai-query';
     }
   </script>
-  <script src="db-sqlite.js?v=1783569607"></script>
-  <script src="local-first.js?v=1783569607"></script>
-  <script src="app.js?v=1783569607"></script>
+  <script src="db-sqlite.js?v=1783581776"></script>
+  <script src="local-first.js?v=1783581776"></script>
+  <script src="app.js?v=1783581776"></script>
   <!-- Precom (ITR-A/Punch): DB thu 2, LAZY - chi tai khi mo tab Precom -->
-  <script src="precom-db.js?v=1783569607"></script>
-  <script src="precom.js?v=1783569607"></script>
+  <script src="precom-db.js?v=1783581776"></script>
+  <script src="precom.js?v=1783581776"></script>
   <!-- AI Assistant: ask-your-data (text-to-SQL over the local SQLite) -->
-  <script src="ai-assistant.js?v=1783569607"></script>
+  <script src="ai-assistant.js?v=1783581776"></script>
 </body>
 </html>
