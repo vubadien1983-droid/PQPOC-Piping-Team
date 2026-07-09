@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="style.css?v=1783584152">
+  <link rel="stylesheet" href="style.css?v=1783588599">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -512,15 +512,14 @@
         <div class="dash-zone-header">
           <span class="dash-zone-tag tag-purple">Precom</span>
           <h2>Precom Handover — ITR-A Checksheet Status</h2>
-          <div id="precom-disc-btns" style="display:flex; align-items:center; gap:0.3rem; flex-wrap:wrap; margin-left:0.9rem;"></div>
           <div style="display:flex; align-items:center; gap:0.5rem; margin-left:auto; flex-wrap:wrap;">
-            <select id="precom-system-filter" style="background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.1); border-radius:6px; color:var(--text-main); padding:0.3rem 0.5rem; font-size:0.72rem; outline:none;"></select>
+            <div id="precom-system-dd" class="pcm-dd"></div>
             <input type="text" id="precom-search" placeholder="Lọc subsystem..." style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:6px; color:var(--text-main); padding:0.3rem 0.5rem; font-size:0.72rem; outline:none; width:150px;">
             <label style="display:flex; align-items:center; gap:0.3rem; font-size:0.7rem; color:var(--text-muted); cursor:pointer;">
               <input type="checkbox" id="precom-pending-toggle"> Chỉ chưa xong
             </label>
             <button class="btn btn-secondary" id="precom-clear-btn" style="display:none; padding:0.3rem 0.6rem; font-size:0.7rem; min-height:auto; border-color:rgba(244,63,94,0.4); color:#e11d48;" title="Bỏ tất cả bộ lọc + lựa chọn">Xoá lọc</button>
-            <button class="btn btn-secondary" id="precom-export-btn" style="padding:0.3rem 0.6rem; font-size:0.7rem; min-height:auto;" title="Export theo phạm vi đang chọn (system/subsystem/discipline)">Export lựa chọn</button>
+            <button class="btn btn-secondary" id="precom-export-btn" style="padding:0.3rem 0.6rem; font-size:0.7rem; min-height:auto; color:#0369a1; background:#ffffff; border:1px solid #0369a1;" title="Export theo phạm vi đang chọn (system/subsystem/discipline)">Export lựa chọn</button>
             <button class="btn btn-primary" id="precom-export-all-btn" style="padding:0.3rem 0.6rem; font-size:0.7rem; min-height:auto;" title="Export toàn bộ dữ liệu + summary DAC/CSSC">Export All</button>
           </div>
         </div>
@@ -603,9 +602,9 @@
   </div>
 
   <!-- Scripts -->
-  <script src="fabrication-status.js?v=1783584152"></script>
+  <script src="fabrication-status.js?v=1783588599"></script>
   <!-- Idle manager: singleton tab lock + auto-logout after 60 min inactivity -->
-  <script src="idle-manager.js?v=1783584152"></script>
+  <script src="idle-manager.js?v=1783588599"></script>
   <!-- PLAN A (Full Local-first): tải piping_data.db.gz từ GitHub về máy, chạy SQLite-WASM.
        Khi chạy localhost, view=live/testpacks gọi server local (server.js) thay vì Vercel.
        Bản hybrid cũ (precompute.js) đã đưa vào _quarantine. -->
@@ -618,13 +617,13 @@
       window.AI_API_URL = 'https://block-b-piping-fab.vercel.app/api/ai-query';
     }
   </script>
-  <script src="db-sqlite.js?v=1783584152"></script>
-  <script src="local-first.js?v=1783584152"></script>
-  <script src="app.js?v=1783584152"></script>
+  <script src="db-sqlite.js?v=1783588599"></script>
+  <script src="local-first.js?v=1783588599"></script>
+  <script src="app.js?v=1783588599"></script>
   <!-- Precom (ITR-A/Punch): DB thu 2, LAZY - chi tai khi mo tab Precom -->
-  <script src="precom-db.js?v=1783584152"></script>
-  <script src="precom.js?v=1783584152"></script>
+  <script src="precom-db.js?v=1783588599"></script>
+  <script src="precom.js?v=1783588599"></script>
   <!-- AI Assistant: ask-your-data (text-to-SQL over the local SQLite) -->
-  <script src="ai-assistant.js?v=1783584152"></script>
+  <script src="ai-assistant.js?v=1783588599"></script>
 </body>
 </html>

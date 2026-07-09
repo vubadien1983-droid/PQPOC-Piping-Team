@@ -135,6 +135,17 @@
     '.pcm-kbox .kdone{color:#059669;cursor:pointer;font-weight:800;}' +
     '.pcm-kbox .ktot{cursor:pointer;}' +
     '.pcm-kbox .kdone:hover,.pcm-kbox .ktot:hover{text-decoration:underline;}' +
+    // Dropdown system tuy bien (theme sang) - hien CSSC-ready(xanh)/tong subsystem
+    '.pcm-dd{position:relative;display:inline-block;}' +
+    '.pcm-dd-btn{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #c4cedb;border-radius:6px;color:#17233b;padding:.3rem .6rem;font-size:.72rem;cursor:pointer;font-weight:600;}' +
+    '.pcm-dd-btn:hover{border-color:#0369a1;}' +
+    '.pcm-dd-cssc{font-size:.66rem;color:#5b6b80;}' +
+    '.pcm-dd-caret{color:#5b6b80;font-size:.6rem;}' +
+    '.pcm-dd-panel{position:fixed;z-index:100000;background:#fff;border:1px solid #c4cedb;border-radius:6px;box-shadow:0 8px 24px rgba(15,38,71,.22);max-height:340px;overflow-y:auto;min-width:230px;}' +
+    '.pcm-dd-opt{display:flex;justify-content:space-between;gap:14px;align-items:center;padding:4px 10px;font-size:.72rem;color:#17233b;cursor:pointer;white-space:nowrap;}' +
+    '.pcm-dd-opt:hover{background:#e8f0fe;}' +
+    '.pcm-dd-opt.sel{background:#eef4ff;font-weight:800;}' +
+    '.pcm-dd-ct{font-size:.68rem;color:#5b6b80;}' +
     '</style>';
 
   function ssShort(ss) { return String(ss || '').replace(/^CPPT-/i, ''); }
@@ -172,12 +183,7 @@
   }
 
   function buildToolbar() {
-    var systems = window.PrecomDB.query(
-      "SELECT system_no, COUNT(DISTINCT subsystem) ss FROM precom_summary WHERE system_no IS NOT NULL GROUP BY system_no ORDER BY system_no");
-    var sel = el('precom-system-filter');
-    sel.innerHTML = '<option value="__ALL__">Tất cả systems (' + systems.length + ')</option>' +
-      systems.map(function (s) { return '<option value="' + esc(s.system_no) + '">' + esc(s.system_no) + ' (' + s.ss + ')</option>'; }).join('');
-    sel.onchange = function () { state.system = sel.value; state.sel = { type: 'all' }; render(); };
+    buildSystemDD();   // dropdown system tuy bien: hien CSSC-ready(xanh)/tong subsystem
     el('precom-search').oninput = function (e) { state.q = e.target.value.trim().toUpperCase(); render(); };
     el('precom-pending-toggle').onchange = function (e) { state.onlyPending = e.target.checked; render(); };
     el('precom-export-btn').onclick = function () { exportData(false); };
@@ -187,26 +193,50 @@
     if (clr) clr.onclick = function () {
       state.system = '__ALL__'; state.q = ''; state.onlyPending = false;
       state.sel = { type: 'all' }; state.kpiSel = null;
-      sel.value = '__ALL__'; el('precom-search').value = ''; el('precom-pending-toggle').checked = false;
-      render();
+      el('precom-search').value = ''; el('precom-pending-toggle').checked = false;
+      render(); buildSystemDD();
     };
-    // ---- Nut cho tung DISCIPLINE (yeu cau user): click -> modal chi tiet discipline ----
-    var dbtns = el('precom-disc-btns');
-    if (dbtns) {
-      var dc = window.PrecomDB.query(
-        "SELECT discipline, SUM(itr_total) it, SUM(itr_done) idn FROM precom_summary WHERE discipline<>'' GROUP BY discipline");
-      var cmap = {}; dc.forEach(function (r) { cmap[r.discipline] = r; });
-      dbtns.innerHTML = '<span class="pcm-lbl">Discipline</span>' +
-        state.disciplines.map(function (d) {
-          var c = cmap[d] || { it: 0, idn: 0 };
-          return '<button class="pcm-disc-btn" data-disc="' + esc(d) + '" title="Click: mở chi tiết toàn bộ discipline ' + esc(d) + '">' +
-            esc(d) + '<span class="n">' + (c.idn || 0) + '/' + (c.it || 0) + '</span></button>';
-        }).join('');
-      dbtns.querySelectorAll('[data-disc]').forEach(function (b) {
-        b.onclick = function () { openDisciplineModal(b.getAttribute('data-disc')); };
-      });
-    }
+    document.addEventListener('click', function () { var p = el('precom-dd-panel'); if (p) p.style.display = 'none'; });
     window.addEventListener('precomdb-updated', function () { render(); });
+  }
+
+  // ---- Dropdown system tuy bien: moi option hien CSSC-ready(xanh)/tong subsystem ----
+  function systemStats() {
+    return window.PrecomDB.query(
+      "SELECT system_no, COUNT(*) tot, SUM(cssc) cssc FROM (" +
+      " SELECT system_no, subsystem, CASE WHEN SUM(CASE WHEN itr_done>=itr_total AND COALESCE(punch_a_open,0)=0 THEN 1 ELSE 0 END)=COUNT(*) THEN 1 ELSE 0 END cssc" +
+      " FROM precom_summary WHERE system_no IS NOT NULL GROUP BY system_no, subsystem)" +
+      " GROUP BY system_no ORDER BY system_no");
+  }
+  function setSystem(v) { state.system = v; state.sel = { type: 'all' }; render(); buildSystemDD(); }
+  function buildSystemDD() {
+    var dd = el('precom-system-dd'); if (!dd) return;
+    var stats = systemStats(), totAll = 0, csscAll = 0;
+    stats.forEach(function (s) { totAll += s.tot; csscAll += s.cssc; });
+    var opts = [{ v: '__ALL__', label: 'Tất cả systems', n: stats.length, cssc: csscAll, tot: totAll }]
+      .concat(stats.map(function (s) { return { v: s.system_no, label: s.system_no, n: null, cssc: s.cssc, tot: s.tot }; }));
+    var cur = opts.filter(function (o) { return o.v === state.system; })[0] || opts[0];
+    dd.innerHTML =
+      '<button type="button" class="pcm-dd-btn" id="precom-dd-btn" title="Chọn system — số CSSC-ready (xanh) / tổng subsystem">' +
+        '<span class="pcm-dd-cur">' + esc(cur.label) + (cur.n != null ? ' (' + cur.n + ')' : '') + '</span>' +
+        '<span class="pcm-dd-cssc"><b style="color:#059669;">' + cur.cssc + '</b>/' + cur.tot + ' CSSC</span>' +
+        '<span class="pcm-dd-caret">▾</span></button>' +
+      '<div class="pcm-dd-panel" id="precom-dd-panel" style="display:none;">' +
+        opts.map(function (o) {
+          return '<div class="pcm-dd-opt' + (o.v === state.system ? ' sel' : '') + '" data-sysv="' + esc(o.v) + '">' +
+            '<span class="pcm-dd-nm">' + esc(o.label) + (o.n != null ? ' (' + o.n + ')' : '') + '</span>' +
+            '<span class="pcm-dd-ct"><b style="color:#059669;">' + o.cssc + '</b> / ' + o.tot + '</span></div>';
+        }).join('') + '</div>';
+    var btn = el('precom-dd-btn'), panel = el('precom-dd-panel');
+    btn.onclick = function (e) {
+      e.stopPropagation();
+      if (panel.style.display === 'block') { panel.style.display = 'none'; return; }
+      var r = btn.getBoundingClientRect();
+      panel.style.left = r.left + 'px'; panel.style.top = (r.bottom + 2) + 'px'; panel.style.display = 'block';
+    };
+    panel.querySelectorAll('[data-sysv]').forEach(function (o) {
+      o.onclick = function (e) { e.stopPropagation(); setSystem(o.getAttribute('data-sysv')); };
+    });
   }
 
   // ---- Data -----------------------------------------------------------------------
