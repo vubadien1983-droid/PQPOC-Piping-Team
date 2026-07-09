@@ -90,6 +90,32 @@
     '#precom-detail tr.done td{background:#e9f7ef;}' +
     '#precom-detail tr.opa td{background:#fde8e8;}' +
     '.pcm-det-btn{padding:2px 10px;font-size:.6rem;border-radius:5px;border:1px solid #0369a1;color:#0369a1;background:#fff;cursor:pointer;font-weight:700;}' +
+    // ---- FULL-SCREEN MODAL + bang bao cao chuyen nghiep ----
+    '.pcm-modal{position:fixed;inset:0;z-index:99999;display:none;background:rgba(15,23,42,.55);}' +
+    '.pcm-modal.show{display:flex;}' +
+    '.pcm-win{margin:auto;width:96vw;height:94vh;background:#eef1f5;border-radius:10px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.45);}' +
+    '.pcm-head{flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:10px 16px;background:linear-gradient(90deg,#0f2647,#1e3a63);color:#fff;}' +
+    '.pcm-head h2{font-size:1rem;margin:0;font-weight:800;letter-spacing:.02em;white-space:nowrap;}' +
+    '.pcm-head .pcm-sub{flex:1;font-size:.72rem;color:#c7d4e6;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}' +
+    '.pcm-btn{padding:6px 14px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;color:#0f2647;font-weight:700;font-size:.72rem;cursor:pointer;}' +
+    '.pcm-btn:hover{background:#e8f0fe;}' +
+    '.pcm-btn.x{background:transparent;color:#fff;border-color:#5b7196;font-size:.95rem;padding:3px 11px;font-weight:800;}' +
+    '.pcm-body{flex:1 1 auto;overflow:auto;padding:14px 16px;}' +
+    '.pcm-kpis{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}' +
+    '.pcm-kbox{flex:1 1 130px;background:#fff;border:1px solid #dbe2ea;border-radius:8px;padding:8px 10px;box-shadow:0 1px 2px rgba(0,0,0,.05);}' +
+    '.pcm-kbox .kl{font-size:.62rem;color:#5b6b80;font-weight:700;text-transform:uppercase;letter-spacing:.03em;}' +
+    '.pcm-kbox .kf{font-size:1.05rem;font-weight:800;color:#0f2647;}' +
+    '.pcm-kbox .kp{font-size:.72rem;font-weight:800;}' +
+    '.pcm-chartbox{background:#fff;border:1px solid #dbe2ea;border-radius:8px;padding:8px;height:320px;margin-bottom:14px;}' +
+    '.pcm-rpt{width:100%;border-collapse:collapse;background:#fff;margin:4px 0 18px;font-size:.7rem;box-shadow:0 1px 4px rgba(15,38,71,.1);}' +
+    '.pcm-rpt caption{caption-side:top;text-align:left;font-weight:800;color:#0f2647;font-size:.82rem;padding:8px 2px 6px;}' +
+    '.pcm-rpt thead th{position:sticky;top:0;background:#0f2647;color:#fff;font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em;padding:6px 8px;text-align:left;border:1px solid #24406b;z-index:2;}' +
+    '.pcm-rpt tbody td{padding:4px 8px;border:1px solid #e2e8f0;color:#17233b;vertical-align:top;}' +
+    '.pcm-rpt tbody tr:nth-child(even) td{background:#f4f7fb;}' +
+    '.pcm-rpt tbody tr.done td{background:#e6f6ec;}' +
+    '.pcm-rpt tbody tr.opa td{background:#fdeaea;}' +
+    '.pcm-rpt tbody tr:hover td{background:#e8f0fe;}' +
+    '.pcm-gt{cursor:pointer;}.pcm-sys-row td{cursor:pointer;}' +
     '</style>';
 
   function ssShort(ss) { return String(ss || '').replace(/^CPPT-/i, ''); }
@@ -219,7 +245,7 @@
               .map(function (d) { return chip(shortDisc(d), dAgg[d].dacN, dAgg[d].cellN); })) +
       kpiCard('cssc', 'CSSC (Subsystem)', csscN, list.length, '#059669', csscBySystem(list));
     el('precom-kpis').querySelectorAll('[data-kpi]').forEach(function (card) {
-      card.onclick = function () { _click = true; state.kpiSel = card.getAttribute('data-kpi'); state.sel = { type: 'all' }; render(); };
+      card.onclick = function () { openKpiModal(card.getAttribute('data-kpi')); };
     });
 
     var discs = state.disciplines;   // bang chinh LUON hien du cac discipline
@@ -233,7 +259,7 @@
     function subCell(g, d, val, p, extraCls) {
       var selCls = (state.sel.type === 'cell' && state.sel.ss === g.subsystem && state.sel.disc === d) ? ' sel' : '';
       return '<td class="pcm-c' + (extraCls || '') + selCls + '" data-ss="' + esc(g.subsystem) +
-        '" data-disc="' + esc(d) + '" title="' + esc(g.subsystem) + ' · ' + esc(d) + ' — click: lọc + chart · double-click: danh sách tag">' +
+        '" data-disc="' + esc(d) + '" title="' + esc(g.subsystem) + ' · ' + esc(d) + ' — Click: xem chi tiết (toàn màn hình)">' +
         val + (p === null ? '' : '<div class="pp ' + pctCls(p) + '">' + p + '%</div>') + '</td>';
     }
 
@@ -241,7 +267,7 @@
     list.forEach(function (g) {
       if (g.system !== lastSys) {
         lastSys = g.system;
-        html += '<tr class="pcm-sys-row"><td colspan="' + nCols + '">SYSTEM ' + esc(g.system || '?') + '</td></tr>';
+        html += '<tr class="pcm-sys-row"><td colspan="' + nCols + '" data-sys="' + esc(g.system || '') + '" title="Click: xem chi tiết cả system">SYSTEM ' + esc(g.system || '?') + '</td></tr>';
       }
       var p = pct(g.done, g.total);
       var cells = discs.map(function (d) {
@@ -260,16 +286,16 @@
         return itr + pa + pb;
       }).join('');
       html += '<tr class="' + (g.cssc ? 'pcm-cssc' : '') + '">' +
-        '<td class="pcm-ssname" data-ssname="' + esc(g.subsystem) + '" title="' + esc(g.subsystem) + ' — ' + esc(g.desc) + ' · Click: lọc + chart · Double-click: danh sách tag">' +
+        '<td class="pcm-ssname" data-ssname="' + esc(g.subsystem) + '" title="' + esc(g.subsystem) + ' — ' + esc(g.desc) + ' · Click: xem chi tiết (toàn màn hình)">' +
         '<strong>' + esc(ssShort(g.subsystem)) + '</strong></td>' +
         cells +
-        '<td class="pcm-gt">' + g.done + '/' + g.total +
+        '<td class="pcm-gt" data-ssname="' + esc(g.subsystem) + '" title="Click: xem chi tiết subsystem">' + g.done + '/' + g.total +
         '<div class="pp ' + pctCls(p) + '">' + p + '%</div>' +
         '<span class="pcm-badge ' + (g.cssc ? 'cssc' : 'no') + '">' + (g.cssc ? 'CSSC' : g.dacN + '/' + g.discN + ' DAC') + '</span></td></tr>';
     });
 
     el('precom-body').innerHTML =
-      '<div class="pcm-hint">Click ô discipline / tên subsystem để LỌC bảng + xem biểu đồ · Double-click: danh sách tag · Ô xanh = đạt DAC · Nút "Xoá lọc" để hiện lại tất cả</div>' +
+      '<div class="pcm-hint">Click ô discipline / tên subsystem / system / thẻ KPI → mở cửa sổ chi tiết toàn màn hình (có Export Excel) · Ô xanh = đạt DAC</div>' +
       '<div class="table-container" style="flex:0 0 auto;min-height:120px;">' +
       '<table><thead>' + thead + '</thead><tbody>' +
       (html || '<tr><td colspan="' + nCols + '" class="text-center" style="padding:2rem;">Không có subsystem nào khớp bộ lọc.</td></tr>') +
@@ -277,13 +303,15 @@
       '<div id="precom-detail" style="display:none;"></div>' +
       '<div id="precom-chart-wrap"><canvas id="precom-chart"></canvas></div>';
 
+    // Click BAT KY thong tin tong hop nao -> mo modal full-screen chi tiet (yeu cau user)
     el('precom-body').querySelectorAll('td[data-ss][data-disc]').forEach(function (td) {
-      td.onclick = function () { _click = true; state.kpiSel = null; state.sel = { type: 'cell', ss: td.getAttribute('data-ss'), disc: td.getAttribute('data-disc') }; render(); };
-      td.ondblclick = function () { showDetail(td.getAttribute('data-ss'), td.getAttribute('data-disc')); };
+      td.onclick = function () { openScopeModal({ type: 'cell', ss: td.getAttribute('data-ss'), disc: td.getAttribute('data-disc') }); };
     });
     el('precom-body').querySelectorAll('[data-ssname]').forEach(function (td) {
-      td.onclick = function () { _click = true; state.kpiSel = null; state.sel = { type: 'ss', ss: td.getAttribute('data-ssname') }; render(); };
-      td.ondblclick = function () { showDetail(td.getAttribute('data-ssname'), null); };
+      td.onclick = function () { openScopeModal({ type: 'ss', ss: td.getAttribute('data-ssname') }); };
+    });
+    el('precom-body').querySelectorAll('[data-sys]').forEach(function (td) {
+      td.onclick = function () { openScopeModal({ type: 'sys', sys: td.getAttribute('data-sys') }); };
     });
 
     renderDetail();
@@ -300,8 +328,8 @@
   }
 
   // ---- PREVIEW DETAIL: click o/subsystem -> bang chi tiet tu DU LIEU NGUON -------
-  function detailQueries() {
-    var sc = scopeWhere();
+  function detailQueries(sc) {
+    sc = sc || scopeWhere();
     var itr = window.PrecomDB.query(
       'SELECT system_no, subsystem, tag_no, tag_desc, discipline, cs_type, plan_start, plan_finish, complete_date, norm, location' +
       ' FROM itr_a WHERE 1=1' + sc.sql +
@@ -527,18 +555,22 @@
   }
 
   // ---- Chart: truc thoi gian LIEN TUC ------------------------------------------------
-  function scopeWhere() {
+  function scopeWhereFor(sel, system) {
     var w = [], p = [];
-    if (state.sel.type === 'cell') { w.push('UPPER(TRIM(subsystem))=?'); p.push(state.sel.ss); w.push('UPPER(TRIM(discipline))=?'); p.push(state.sel.disc.toUpperCase()); }
-    else if (state.sel.type === 'ss') { w.push('UPPER(TRIM(subsystem))=?'); p.push(state.sel.ss); }
-    else if (state.system !== '__ALL__') { w.push('system_no=?'); p.push(state.system); }
+    if (sel && sel.type === 'cell') { w.push('UPPER(TRIM(subsystem))=?'); p.push(sel.ss); w.push('UPPER(TRIM(discipline))=?'); p.push(sel.disc.toUpperCase()); }
+    else if (sel && sel.type === 'ss') { w.push('UPPER(TRIM(subsystem))=?'); p.push(sel.ss); }
+    else if (sel && sel.type === 'sys') { w.push('system_no=?'); p.push(sel.sys); }
+    else if (system && system !== '__ALL__') { w.push('system_no=?'); p.push(system); }
     return { sql: w.length ? (' AND ' + w.join(' AND ')) : '', params: p };
   }
-  function scopeLabel() {
-    if (state.sel.type === 'cell') return state.sel.ss + ' · ' + state.sel.disc;
-    if (state.sel.type === 'ss') return state.sel.ss;
+  function scopeWhere() { return scopeWhereFor(state.sel, state.system); }
+  function scopeLabelFor(sel) {
+    if (sel && sel.type === 'cell') return ssShort(sel.ss) + ' · ' + sel.disc;
+    if (sel && sel.type === 'ss') return ssShort(sel.ss);
+    if (sel && sel.type === 'sys') return 'SYSTEM ' + sel.sys;
     return state.system === '__ALL__' ? 'Toàn dự án' : 'System ' + state.system;
   }
+  function scopeLabel() { return scopeLabelFor(state.sel); }
   function addDays(dstr, n) {
     var d = new Date(dstr + 'T00:00:00');
     d.setDate(d.getDate() + n);
@@ -553,7 +585,14 @@
   }
 
   function renderChart() {
-    var sc = scopeWhere();
+    var ctx = el('precom-chart');
+    if (!ctx) return;
+    if (_chart) { try { _chart.destroy(); } catch (e) {} _chart = null; }
+    _chart = drawSCurve(ctx, scopeWhere());
+  }
+  // S-curve tai-su-dung cho ca tab chinh lan modal. Tra ve Chart (hoac null).
+  function drawSCurve(ctx, sc) {
+    if (!ctx || typeof Chart === 'undefined') return null;
     var act = window.PrecomDB.query(
       "SELECT substr(complete_date,1,10) d, COUNT(*) c FROM itr_a WHERE complete_date IS NOT NULL AND TRIM(complete_date)<>''" +
       sc.sql + ' GROUP BY d ORDER BY d', sc.params);
@@ -586,10 +625,7 @@
     var cum = 0, cumAct = labels.map(function (d) { cum += (mAct[d] || 0); return cum; });
     var cp = 0, cumPlan = labels.map(function (d) { cp += (mPlan[d] || 0); return cp; });
 
-    var ctx = el('precom-chart');
-    if (!ctx || typeof Chart === 'undefined') return;
-    if (_chart) { try { _chart.destroy(); } catch (e) {} _chart = null; }
-    _chart = new Chart(ctx, {
+    return new Chart(ctx, {
       data: {
         labels: labels,
         datasets: [
@@ -647,80 +683,290 @@
     modal.style.display = 'flex';
   }
 
-  // ---- Export Excel: highlight mau nhu app --------------------------------------------
-  var XL = { header: 'FF0F172A', headerFont: 'FFFFFFFF', dac: 'FFC6EFCE', dacFont: 'FF047857',
-             cssc: 'FFB7E6C9', sysRow: 'FFDCD7F5' };
+  // ---- Export Excel tab (Summary DAC/CSSC + ITR-A raw) - dinh dang bao cao ----
   function exportData(all) {
-    if (typeof ExcelJS === 'undefined') { alert('ExcelJS chưa sẵn sàng.'); return; }
-    var wb = new ExcelJS.Workbook();
-
     var keepSys = state.system, keepSel = state.sel;
     if (all) { state.system = '__ALL__'; state.sel = { type: 'all' }; }
     var list = loadRows(), discs = state.disciplines;
     state.system = keepSys; state.sel = keepSel;
 
-    // Sheet 1: Summary DAC/CSSC — SubSystem DAY DU + Description (yeu cau user)
-    var ws = wb.addWorksheet('DAC_CSSC_Summary');
-    var head = ['System', 'SubSystemNo', 'SubSystem Description'];
+    // Sheet 1: ma tran DAC/CSSC (disc x [ITR-A|PunchA|PunchB]); o DAC to xanh, hang CSSC to xanh
+    var head = ['System', 'SubSystemNo', 'Description'];
     discs.forEach(function (d) { head.push(d + ' ITR-A', d + ' PunchA', d + ' PunchB'); });
-    head.push('ITR done', 'ITR total', '%ITR', 'PunchA closed/total', 'PunchB closed/total', 'DAC', 'CSSC');
-    ws.addRow(head);
-    list.forEach(function (g) {
-      var row = [g.system, g.subsystem, g.desc];
-      var dacCols = [];   // vi tri cot can to xanh DAC (1-based)
+    head.push('ITR done/total', '%ITR', 'PunchA closed/total', 'PunchB closed/total', 'DAC', 'CSSC');
+    var dacMark = [];   // dacMark[ri][ci 0-based] = 1 -> to xanh DAC
+    var rows = list.map(function (g) {
+      var row = [g.system, g.subsystem, g.desc], mark = {};
       discs.forEach(function (d, di) {
-        var r = g.disc[d], base = 4 + di * 3;
-        if (r && r.itr_total) {
-          row.push(r.itr_done + '/' + r.itr_total + ' (' + pct(r.itr_done, r.itr_total) + '%)');
+        var r = g.disc[d], base = 3 + di * 3;   // cot dau (0-based) cua discipline nay
+        if (r && (r.itr_total || r.pa_t || r.pb_t)) {
+          row.push(r.itr_total ? (r.itr_done + '/' + r.itr_total + ' (' + pct(r.itr_done, r.itr_total) + '%)') : '-');
           row.push(r.pa_t ? (r.pa_t - r.pa_o) + '/' + r.pa_t : '-');
           row.push(r.pb_t ? (r.pb_t - r.pb_o) + '/' + r.pb_t : '-');
-          if (r.dac) dacCols.push(base, base + 1, base + 2);
+          if (r.dac) { mark[base] = 1; mark[base + 1] = 1; mark[base + 2] = 1; }
         } else { row.push('', '', ''); }
       });
-      row.push(g.done, g.total, pct(g.done, g.total) + '%',
+      row.push(g.done + '/' + g.total, pct(g.done, g.total) + '%',
                g.paT ? (g.paT - g.paO) + '/' + g.paT : '-',
                g.pbT ? (g.pbT - g.pbO) + '/' + g.pbT : '-',
                g.dacN + '/' + g.discN, g.cssc ? 'CSSC' : '');
-      var xr = ws.addRow(row);
-      // Highlight: o DAC xanh nhat; ca hang xanh khi CSSC (giong app)
-      if (g.cssc) xr.eachCell(function (c) { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: XL.cssc } }; });
-      dacCols.forEach(function (ci) {
-        var c = xr.getCell(ci);
-        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: XL.dac } };
-        c.font = { color: { argb: XL.dacFont }, bold: true };
-      });
+      dacMark.push(mark);
+      return row;
     });
+    var sub = _rptSub(all ? 'Toàn dự án (tất cả)' : scopeLabel());
 
-    // Sheet 2: raw ITR-A theo pham vi (all -> toan bo); dong done to xanh nhat
+    // Sheet 2: ITR-A raw theo pham vi
     var sc = all ? { sql: '', params: [] } : scopeWhere();
     var raw = window.PrecomDB.query(
       'SELECT system_no, subsystem, subsystem_desc, tag_no, tag_desc, discipline, cs_type,' +
       ' plan_start, plan_finish, complete_date, norm, location FROM itr_a WHERE 1=1' + sc.sql +
       ' ORDER BY subsystem, discipline, tag_no', sc.params);
-    var ws2 = wb.addWorksheet('ITR-A_Data');
-    if (raw.length) {
-      var cols = Object.keys(raw[0]);
-      ws2.addRow(cols);
-      raw.forEach(function (r) {
-        var xr = ws2.addRow(cols.map(function (c) { return r[c]; }));
-        if (r.complete_date && String(r.complete_date).trim() !== '') {
-          xr.eachCell(function (c) { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: XL.dac } }; });
-        }
+    var rawHead = ['System', 'Subsystem', 'Description', 'TagNo', 'Tag Description', 'Discipline', 'ITR', 'Plan Start', 'Plan Finish', 'Complete', 'Norm', 'Location'];
+    var rawRows = raw.map(function (r) { return [r.system_no, r.subsystem, r.subsystem_desc, r.tag_no, r.tag_desc, r.discipline, r.cs_type, _day(r.plan_start), _day(r.plan_finish), _day(r.complete_date), r.norm, r.location]; });
+
+    writeReport(all ? 'Precom_All.xlsx' : ('Precom_' + scopeLabel().replace(/[^\w-]+/g, '_') + '.xlsx'),
+      'BÁO CÁO PRECOM — DAC / CSSC', [
+        { name: 'DAC_CSSC_Summary', head: head, rows: rows, subtitle: sub,
+          rowFill: function (ri) { return list[ri].cssc ? 'FFDFF3E7' : null; },
+          cellFill: function (ri, ci) { return dacMark[ri][ci] ? 'FFC6EFCE' : null; } },
+        { name: 'ITR-A_Data', head: rawHead, rows: rawRows, subtitle: sub,
+          rowFill: function (ri) { return (raw[ri].complete_date && String(raw[ri].complete_date).trim() !== '') ? 'FFE6F6EC' : null; } }
+      ]);
+  }
+
+  // ==================== FULL-SCREEN MODAL (click summary -> chi tiet) ====================
+  var _mchart = null;                       // chart trong modal
+  var RB = { top:    { style: 'thin', color: { argb: 'FFD3DAE3' } },
+             left:   { style: 'thin', color: { argb: 'FFD3DAE3' } },
+             bottom: { style: 'thin', color: { argb: 'FFD3DAE3' } },
+             right:  { style: 'thin', color: { argb: 'FFD3DAE3' } } };
+
+  function ensureModal() {
+    if (el('pcm-modal')) return;
+    var m = document.createElement('div');
+    m.id = 'pcm-modal'; m.className = 'pcm-modal';
+    m.innerHTML =
+      '<div class="pcm-win">' +
+        '<div class="pcm-head">' +
+          '<h2 id="pcm-title">Chi tiết</h2>' +
+          '<span class="pcm-sub" id="pcm-sub"></span>' +
+          '<button class="pcm-btn" id="pcm-export">⬇ Export Excel</button>' +
+          '<button class="pcm-btn x" id="pcm-close" title="Đóng (Esc)">✕</button>' +
+        '</div>' +
+        '<div class="pcm-body" id="pcm-body"></div>' +
+      '</div>';
+    document.body.appendChild(m);
+    el('pcm-close').onclick = closeModal;
+    m.addEventListener('click', function (e) { if (e.target === m) closeModal(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && el('pcm-modal') && el('pcm-modal').classList.contains('show')) closeModal(); });
+  }
+  function showModal() { ensureModal(); el('pcm-modal').classList.add('show'); }
+  function closeModal() {
+    var m = el('pcm-modal'); if (m) m.classList.remove('show');
+    if (_mchart) { try { _mchart.destroy(); } catch (e) {} _mchart = null; }
+  }
+  function _day(v) { return esc(String(v || '').slice(0, 10)); }
+  function kbox(label, closed, total, color) {
+    var p = pct(closed, total);
+    return '<div class="pcm-kbox" style="border-top:3px solid ' + color + ';">' +
+      '<div class="kl">' + esc(label) + '</div>' +
+      '<div class="kf">' + closed.toLocaleString() + ' / ' + total.toLocaleString() + '</div>' +
+      '<div class="kp ' + pctCls(p) + '">' + p + '%</div></div>';
+  }
+  function reportTable(caption, head, rows) {
+    return '<table class="pcm-rpt"><caption>' + esc(caption) + '</caption><thead><tr>' +
+      head.map(function (h) { return '<th>' + esc(h) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      (rows.join('') || '<tr><td colspan="' + head.length + '" style="text-align:center;padding:1rem;">Không có dữ liệu.</td></tr>') +
+      '</tbody></table>';
+  }
+
+  // ---- Modal cho 1 PHAM VI (o discipline / subsystem / system) ----
+  function openScopeModal(sel) {
+    var sc = scopeWhereFor(sel, state.system), d = detailQueries(sc), label = scopeLabelFor(sel);
+    var itDone = 0; d.itr.forEach(function (r) { if (r.complete_date && String(r.complete_date).trim() !== '') itDone++; });
+    var paT = 0, paC = 0, pbT = 0, pbC = 0;
+    d.pun.forEach(function (r) {
+      var cat = String(r.category || '').trim().toUpperCase(), cl = String(r.status || '').trim().toUpperCase() === 'CLOSED';
+      if (cat === 'A') { paT++; if (cl) paC++; } else if (cat === 'B') { pbT++; if (cl) pbC++; }
+    });
+    var itrRows = d.itr.map(function (r, i) {
+      var done = r.complete_date && String(r.complete_date).trim() !== '';
+      return '<tr class="' + (done ? 'done' : '') + '"><td>' + (i + 1) + '</td><td><b>' + esc(r.tag_no) + '</b></td>' +
+        '<td>' + esc(r.tag_desc) + '</td><td>' + esc(r.discipline) + '</td><td>' + esc(r.cs_type) + '</td>' +
+        '<td>' + _day(r.plan_start) + '</td><td>' + _day(r.plan_finish) + '</td>' +
+        '<td>' + (done ? _day(r.complete_date) : 'PENDING') + '</td><td>' + esc(r.norm) + '</td></tr>';
+    });
+    var punRows = d.pun.map(function (r, i) {
+      var closed = String(r.status || '').trim().toUpperCase() === 'CLOSED';
+      var openA = !closed && String(r.category || '').trim().toUpperCase() === 'A';
+      return '<tr class="' + (closed ? 'done' : (openA ? 'opa' : '')) + '"><td>' + (i + 1) + '</td>' +
+        '<td><b>' + esc(r.punch_no) + '</b></td><td style="text-align:center;font-weight:800;">' + esc(r.category) + '</td>' +
+        '<td>' + esc(r.phase) + '</td><td>' + esc(r.status) + '</td><td>' + esc(r.discipline) + '</td><td>' + esc(r.tag_no) + '</td>' +
+        '<td style="min-width:220px;white-space:normal;">' + esc(String(r.description || '')) + '</td>' +
+        '<td>' + esc(r.action_by) + '</td><td>' + _day(r.open_date) + '</td><td>' + _day(r.closed_date) + '</td><td>' + _day(r.expected_date) + '</td></tr>';
+    });
+    showModal();
+    el('pcm-title').textContent = 'Chi tiết: ' + label;
+    el('pcm-sub').textContent = 'ITR-A ' + d.itr.length + ' dòng · Punch ' + d.pun.length + ' dòng';
+    el('pcm-body').innerHTML =
+      '<div class="pcm-kpis">' +
+        kbox('ITR-A Done', itDone, d.itr.length, '#0369a1') +
+        kbox('Punch A Closed', paC, paT, '#dc2626') +
+        kbox('Punch B Closed', pbC, pbT, '#d97706') + '</div>' +
+      '<div class="pcm-chartbox"><canvas id="pcm-chart"></canvas></div>' +
+      reportTable('ITR-A Checksheets', ['#', 'TagNo', 'Description', 'Disc', 'ITR', 'Plan Start', 'Plan Finish', 'Complete', 'Norm'], itrRows) +
+      reportTable('Punch List  (đỏ = Cat A Open · xanh = Closed)', ['#', 'PunchNo', 'Cat', 'Phase', 'Status', 'Disc', 'TagNo', 'Defect Description', 'Action By', 'Open', 'Closed', 'Expected'], punRows);
+    if (_mchart) { try { _mchart.destroy(); } catch (e) {} _mchart = null; }
+    _mchart = drawSCurve(el('pcm-chart'), sc);
+    el('pcm-export').onclick = function () { exportScope(label, d); };
+  }
+
+  // ---- Modal cho 1 KPI (itr / pa / dac / cssc) ----
+  function openKpiModal(key) {
+    var sc = scopeWhereFor(null, state.system), d = detailQueries(sc), list = loadRows();
+    var titleMap = { itr: 'ITR-A Checksheets', pa: 'Punch Status (Cat A & B theo Phase)',
+                     dac: 'DAC — Subsystem × Discipline', cssc: 'CSSC — Subsystem' };
+    var cap = titleMap[key], head, rows;
+    if (key === 'itr') {
+      head = ['#', 'Subsystem', 'TagNo', 'Description', 'Disc', 'ITR', 'Plan Finish', 'Complete'];
+      rows = d.itr.map(function (r, i) {
+        var done = r.complete_date && String(r.complete_date).trim() !== '';
+        return '<tr class="' + (done ? 'done' : '') + '"><td>' + (i + 1) + '</td><td>' + esc(ssShort(r.subsystem)) + '</td>' +
+          '<td><b>' + esc(r.tag_no) + '</b></td><td>' + esc(r.tag_desc) + '</td><td>' + esc(r.discipline) + '</td>' +
+          '<td>' + esc(r.cs_type) + '</td><td>' + _day(r.plan_finish) + '</td><td>' + (done ? _day(r.complete_date) : 'PENDING') + '</td></tr>';
+      });
+    } else if (key === 'pa') {
+      head = ['#', 'Subsystem', 'PunchNo', 'Cat', 'Phase', 'Status', 'Disc', 'TagNo', 'Defect Description', 'Action By', 'Open', 'Closed'];
+      var pab = d.pun.filter(function (r) { var c = String(r.category || '').trim().toUpperCase(); return c === 'A' || c === 'B'; })
+        .sort(function (a, b) { return String(a.category || '').toUpperCase().localeCompare(String(b.category || '').toUpperCase()) || String(a.phase || '').toUpperCase().localeCompare(String(b.phase || '').toUpperCase()); });
+      rows = pab.map(function (r, i) {
+        var cl = String(r.status || '').trim().toUpperCase() === 'CLOSED';
+        return '<tr class="' + (cl ? 'done' : 'opa') + '"><td>' + (i + 1) + '</td><td>' + esc(ssShort(r.subsystem)) + '</td>' +
+          '<td><b>' + esc(r.punch_no) + '</b></td><td style="text-align:center;font-weight:800;">' + esc(r.category) + '</td>' +
+          '<td>' + esc(r.phase) + '</td><td>' + esc(r.status) + '</td><td>' + esc(r.discipline) + '</td><td>' + esc(r.tag_no) + '</td>' +
+          '<td style="min-width:220px;white-space:normal;">' + esc(String(r.description || '')) + '</td>' +
+          '<td>' + esc(r.action_by) + '</td><td>' + _day(r.open_date) + '</td><td>' + _day(r.closed_date) + '</td></tr>';
+      });
+    } else if (key === 'dac') {
+      head = ['#', 'Subsystem', 'Description', 'Discipline', 'ITR-A done/total', 'PunchA closed/total', 'PunchA OPEN', 'DAC'];
+      rows = [];
+      list.forEach(function (g) {
+        Object.keys(g.disc).forEach(function (dk) {
+          var r = g.disc[dk];
+          rows.push('<tr class="' + (r.dac ? 'done' : '') + '"><td>' + (rows.length + 1) + '</td><td>' + esc(ssShort(g.subsystem)) + '</td>' +
+            '<td>' + esc(g.desc) + '</td><td>' + esc(dk) + '</td><td>' + r.itr_done + '/' + r.itr_total + '</td>' +
+            '<td>' + (r.pa_t ? (r.pa_t - r.pa_o) + '/' + r.pa_t : '–') + '</td><td>' + (r.pa_o || 0) + '</td><td><b>' + (r.dac ? 'DAC ✓' : '-') + '</b></td></tr>');
+        });
+      });
+    } else {
+      head = ['#', 'Subsystem', 'Description', 'System', 'ITR-A', 'PunchA open', 'DAC đạt', 'CSSC'];
+      rows = list.map(function (g, i) {
+        return '<tr class="' + (g.cssc ? 'done' : '') + '"><td>' + (i + 1) + '</td><td><b>' + esc(ssShort(g.subsystem)) + '</b></td>' +
+          '<td>' + esc(g.desc) + '</td><td>' + esc(g.system) + '</td><td>' + g.done + '/' + g.total + '</td>' +
+          '<td>' + (g.paO || 0) + '</td><td>' + g.dacN + '/' + g.discN + '</td><td><b>' + (g.cssc ? 'CSSC ✓' : '-') + '</b></td></tr>';
       });
     }
-    [ws, ws2].forEach(function (w) {
-      w.getRow(1).eachCell(function (c) {
-        c.font = { bold: true, color: { argb: XL.headerFont } };
-        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: XL.header } };
+    showModal();
+    el('pcm-title').textContent = cap;
+    el('pcm-sub').textContent = (state.system === '__ALL__' ? 'Toàn dự án' : 'System ' + state.system) + ' · ' + rows.length + ' dòng';
+    el('pcm-body').innerHTML = reportTable(cap, head, rows);
+    if (_mchart) { try { _mchart.destroy(); } catch (e) {} _mchart = null; }
+    el('pcm-export').onclick = function () { exportKpi(key, cap, d, list); };
+  }
+
+  // ==================== EXCEL BAO CAO CHUYEN NGHIEP ====================
+  // sheets: [{ name, head:[...], rows:[[...]], subtitle, rowFill:fn(ri)->argb|null }]
+  function writeReport(filename, title, sheets) {
+    if (typeof ExcelJS === 'undefined') { alert('ExcelJS chưa sẵn sàng.'); return; }
+    var wb = new ExcelJS.Workbook();
+    sheets.forEach(function (s) {
+      var ws = wb.addWorksheet(s.name.replace(/[\\\/\?\*\[\]:]/g, ' ').slice(0, 30) || 'Sheet');
+      var nc = s.head.length;
+      ws.mergeCells(1, 1, 1, nc);
+      var tc = ws.getCell(1, 1); tc.value = title;
+      tc.font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' } };
+      tc.alignment = { vertical: 'middle', horizontal: 'left' };
+      tc.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F2647' } };
+      ws.getRow(1).height = 26;
+      ws.mergeCells(2, 1, 2, nc);
+      var stc = ws.getCell(2, 1); stc.value = s.subtitle || '';
+      stc.font = { italic: true, size: 9, color: { argb: 'FF5B6B80' } };
+      var hr = ws.getRow(3);
+      s.head.forEach(function (h, i) {
+        var c = hr.getCell(i + 1); c.value = h;
+        c.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
+        c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A63' } };
+        c.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+        c.border = RB;
       });
-      w.views = [{ state: 'frozen', ySplit: 1 }];
+      hr.height = 20;
+      s.rows.forEach(function (row, ri) {
+        var xr = ws.getRow(4 + ri);
+        row.forEach(function (v, ci) { var c = xr.getCell(ci + 1); c.value = v; c.border = RB; c.alignment = { vertical: 'top' }; });
+        var fill = s.rowFill && s.rowFill(ri);
+        if (fill) { for (var a = 1; a <= nc; a++) xr.getCell(a).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } }; }
+        else if (ri % 2 === 1) { for (var b = 1; b <= nc; b++) xr.getCell(b).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF4F7FB' } }; }
+        if (s.cellFill) { row.forEach(function (v, ci) { var af = s.cellFill(ri, ci); if (af) xr.getCell(ci + 1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: af } }; }); }
+      });
+      s.head.forEach(function (h, i) {
+        var w = String(h).length;
+        s.rows.forEach(function (row) { var v = row[i] == null ? '' : String(row[i]); if (v.length > w) w = v.length; });
+        ws.getColumn(i + 1).width = Math.min(Math.max(w + 2, 8), 50);
+      });
+      ws.views = [{ state: 'frozen', ySplit: 3 }];
+      ws.autoFilter = { from: { row: 3, column: 1 }, to: { row: 3, column: nc } };
     });
     wb.xlsx.writeBuffer().then(function (buf) {
       var a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([buf]));
-      a.download = all ? 'Precom_All.xlsx' : ('Precom_' + scopeLabel().replace(/[^\w-]+/g, '_') + '.xlsx');
-      a.click(); URL.revokeObjectURL(a.href);
+      a.download = filename; a.click(); URL.revokeObjectURL(a.href);
     });
+  }
+  function _rptSub(scopeTxt) {
+    var meta = window.PrecomDB.meta();
+    return 'Phạm vi: ' + scopeTxt + '   ·   Nguồn: ' + (meta.filename || '') +
+      (meta.fileTime ? ' (' + meta.fileTime + ')' : '') + '   ·   Xuất: ' + new Date().toLocaleString();
+  }
+
+  // ---- Export tu MODAL PHAM VI (ITR-A + Punch) ----
+  function exportScope(label, d) {
+    var sub = _rptSub(label);
+    var itrHead = ['#', 'System', 'Subsystem', 'TagNo', 'Description', 'Discipline', 'ITR', 'Plan Start', 'Plan Finish', 'Complete', 'Norm', 'Location'];
+    var itrRows = d.itr.map(function (r, i) { return [i + 1, r.system_no, r.subsystem, r.tag_no, r.tag_desc, r.discipline, r.cs_type, _day(r.plan_start), _day(r.plan_finish), _day(r.complete_date), r.norm, r.location]; });
+    var punHead = ['#', 'Subsystem', 'PunchNo', 'RaisedNo', 'Cat', 'Phase', 'Status', 'Discipline', 'TagNo', 'Defect Description', 'Action By', 'Open', 'Closed', 'Expected'];
+    var punRows = d.pun.map(function (r, i) { return [i + 1, r.subsystem, r.punch_no, r.punch_raised_no, r.category, r.phase, r.status, r.discipline, r.tag_no, r.description, r.action_by, _day(r.open_date), _day(r.closed_date), _day(r.expected_date)]; });
+    writeReport('Precom_' + label.replace(/[^\w-]+/g, '_') + '.xlsx', 'BÁO CÁO PRECOM — ' + label, [
+      { name: 'ITR-A', head: itrHead, rows: itrRows, subtitle: sub,
+        rowFill: function (ri) { var r = d.itr[ri]; return (r.complete_date && String(r.complete_date).trim() !== '') ? 'FFE6F6EC' : null; } },
+      { name: 'Punch', head: punHead, rows: punRows, subtitle: sub,
+        rowFill: function (ri) { var r = d.pun[ri]; if (String(r.status || '').trim().toUpperCase() === 'CLOSED') return 'FFE6F6EC'; if (String(r.category || '').trim().toUpperCase() === 'A') return 'FFFDEAEA'; return null; } }
+    ]);
+  }
+
+  // ---- Export tu MODAL KPI ----
+  function exportKpi(key, cap, d, list) {
+    var sub = _rptSub(state.system === '__ALL__' ? 'Toàn dự án' : 'System ' + state.system);
+    var head, rows, fill;
+    if (key === 'itr') {
+      head = ['#', 'Subsystem', 'TagNo', 'Description', 'Disc', 'ITR', 'Plan Finish', 'Complete'];
+      rows = d.itr.map(function (r, i) { return [i + 1, r.subsystem, r.tag_no, r.tag_desc, r.discipline, r.cs_type, _day(r.plan_finish), (r.complete_date && String(r.complete_date).trim() !== '') ? _day(r.complete_date) : 'PENDING']; });
+      fill = function (ri) { var r = d.itr[ri]; return (r.complete_date && String(r.complete_date).trim() !== '') ? 'FFE6F6EC' : null; };
+    } else if (key === 'pa') {
+      head = ['#', 'Subsystem', 'PunchNo', 'Cat', 'Phase', 'Status', 'Disc', 'TagNo', 'Defect Description', 'Action By', 'Open', 'Closed'];
+      var pab = d.pun.filter(function (r) { var c = String(r.category || '').trim().toUpperCase(); return c === 'A' || c === 'B'; });
+      rows = pab.map(function (r, i) { return [i + 1, r.subsystem, r.punch_no, r.category, r.phase, r.status, r.discipline, r.tag_no, r.description, r.action_by, _day(r.open_date), _day(r.closed_date)]; });
+      fill = function (ri) { return String(pab[ri].status || '').trim().toUpperCase() === 'CLOSED' ? 'FFE6F6EC' : 'FFFDEAEA'; };
+    } else if (key === 'dac') {
+      head = ['#', 'Subsystem', 'Description', 'Discipline', 'ITR-A done/total', 'PunchA closed/total', 'PunchA OPEN', 'DAC'];
+      rows = []; var flags = [];
+      list.forEach(function (g) { Object.keys(g.disc).forEach(function (dk) { var r = g.disc[dk]; rows.push([rows.length + 1, g.subsystem, g.desc, dk, r.itr_done + '/' + r.itr_total, r.pa_t ? (r.pa_t - r.pa_o) + '/' + r.pa_t : '-', r.pa_o || 0, r.dac ? 'DAC' : '']); flags.push(!!r.dac); }); });
+      fill = function (ri) { return flags[ri] ? 'FFE6F6EC' : null; };
+    } else {
+      head = ['#', 'Subsystem', 'Description', 'System', 'ITR done/total', 'PunchA open', 'DAC đạt', 'CSSC'];
+      rows = list.map(function (g, i) { return [i + 1, g.subsystem, g.desc, g.system, g.done + '/' + g.total, g.paO || 0, g.dacN + '/' + g.discN, g.cssc ? 'CSSC' : '']; });
+      fill = function (ri) { return list[ri].cssc ? 'FFE6F6EC' : null; };
+    }
+    writeReport('Precom_' + key.toUpperCase() + '.xlsx', 'BÁO CÁO PRECOM — ' + cap, [{ name: cap, head: head, rows: rows, subtitle: sub, rowFill: fill }]);
   }
 
   window.PrecomInit = initOnce;
