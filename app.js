@@ -558,6 +558,14 @@ function computeHydroDisplay(p) {
   return "-";
 }
 
+// Leak Test readiness for the System Detailed "Leak Test" column: a Test Pack is READY to
+// hand over to Leak Test when Hydrotest is Done AND flange is 100% (no outstanding flange
+// joints — a pack with 0 flange joints counts as satisfied) AND Reinstatement is Done.
+function isLeakReady(p) {
+  const flangeOk = (p.flangeDoneCount || 0) >= (p.flangeTotalCount || 0);
+  return computeHydroDisplay(p) === "Done" && flangeOk && p.reinstStatus === "Done";
+}
+
 // One NDT progress cell for the System Detailed table. Shows "N/A" when the
 // method is not required for this Test Pack, otherwise the done/required bar.
 function ndtCellHtml(done, req) {
@@ -1028,7 +1036,7 @@ function renderDetailedTable() {
           <th style="width: 1%; text-align: center;">Hydrotest Status</th>
           <th style="text-align: center; width: 8%;" title="Flange joints đã tightening / tổng flange joints (theo SpoolsNo)">Flange</th>
           <th style="width: 1%; text-align: center;">Reins Status</th>
-          <th style="width: 1%;">Re-ins Date</th>
+          <th style="width: 1%; text-align: center;" title="Sẵn sàng bàn giao Leak Test: Hydrotest Done + Flange 100% + Reins Done">Leak Test</th>
           <th style="width: 200px;">Note</th>
         </tr>
       </thead>
@@ -1070,7 +1078,10 @@ function renderDetailedTable() {
     
     // 4. Reins status badge
     const reinstBadge = p.reinstStatus === "Done" ? 'done' : 'not-yet';
-    const reinstDateText = p.reinstDate ? formatDate(p.reinstDate) : "-";
+    // Leak Test column: "Ready" (green) when ready to hand over; otherwise blank.
+    const leakTestCell = isLeakReady(p)
+      ? `<td class="text-center"><span style="color: var(--status-done); font-weight:700;">Ready</span></td>`
+      : `<td class="text-center"></td>`;
     
     // 5. Note column — "Inform: Drawing/Joint No./Component to Component" (column M)
     //    of the NDT Tracking Google Sheet (live); multi-line, sheet errors blanked.
@@ -1109,7 +1120,7 @@ function renderDetailedTable() {
       <td class="text-center">${hydroCellInner}</td>
       ${flangeCell}
       <td class="text-center"><span class="status-badge ${reinstBadge}">${p.reinstStatus}</span></td>
-      <td>${reinstDateText}</td>
+      ${leakTestCell}
       <td class="note-cell" title="${escapeHtml(noteRaw)}" style="max-width:320px;"><div style="max-height:84px; overflow-y:auto; white-space:normal; word-break:break-word; font-size:0.72rem; line-height:1.35; color:var(--text-muted);">${noteHtml}</div></td>
     `;
     
@@ -1602,7 +1613,7 @@ async function exportToExcel(tableType, data) {
         { header: 'Hydrotest Status', key: 'hydroStatus', width: 18 },
         { header: 'Flange (Done/Total)', key: 'flange', width: 18 },
         { header: 'Reins Status', key: 'reinstStatus', width: 15 },
-        { header: 'Re-ins Date', key: 'reinstDate', width: 15 },
+        { header: 'Leak Test', key: 'leakTest', width: 12 },
         { header: 'Leak Status', key: 'leakStatus', width: 15 },
         { header: 'Leak Package No', key: 'leakPkgNo', width: 20 },
         { header: 'Note (Inform)', key: 'note', width: 50 }
@@ -1631,7 +1642,7 @@ async function exportToExcel(tableType, data) {
             ? `${p.flangeDoneCount || 0}/${p.flangeTotalCount || 0} (${getProgressPct(p.flangeDoneCount || 0, p.flangeTotalCount || 0)}%)`
             : '-',
           reinstStatus: p.reinstStatus,
-          reinstDate: reinstDateVal,
+          leakTest: isLeakReady(p) ? 'Ready' : '',
           leakStatus: p.leakStatus || '-',
           leakPkgNo: p.leakPkgNo || '-',
           note: (p.note || '').trim() || '-'
