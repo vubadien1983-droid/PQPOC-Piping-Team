@@ -1026,7 +1026,7 @@ function renderDetailedTable() {
           <th style="text-align: center; width: 8%;">MT</th>
           <th style="text-align: center; width: 8%;">PT</th>
           <th style="width: 1%; text-align: center;">Hydrotest Status</th>
-          <th style="width: 1%;">Hydrotest Date</th>
+          <th style="text-align: center; width: 8%;" title="Flange joints đã tightening / tổng flange joints (theo SpoolsNo)">Flange</th>
           <th style="width: 1%; text-align: center;">Reins Status</th>
           <th style="width: 1%;">Re-ins Date</th>
           <th style="width: 200px;">Note</th>
@@ -1062,6 +1062,8 @@ function renderDetailedTable() {
       ? `<span class="hydro-dash">-</span>`
       : `<span class="status-badge ${hydroBadge}">${hydroDisplay}</span>`;
     const hydroDateText = (hydroDisplay === "Done" && p.hydroDate) ? formatDate(p.hydroDate) : "-";
+    // Flange tightening cell (done/total + %) — coloured like the welding/NDT cells.
+    const flangeCell = ndtCellHtml(p.flangeDoneCount || 0, p.flangeTotalCount || 0);
     
     // 4. Reins status badge
     const reinstBadge = p.reinstStatus === "Done" ? 'done' : 'not-yet';
@@ -1102,7 +1104,7 @@ function renderDetailedTable() {
       ${mtCell}
       ${ptCell}
       <td class="text-center">${hydroCellInner}</td>
-      <td>${hydroDateText}</td>
+      ${flangeCell}
       <td class="text-center"><span class="status-badge ${reinstBadge}">${p.reinstStatus}</span></td>
       <td>${reinstDateText}</td>
       <td class="note-cell" title="${escapeHtml(noteRaw)}" style="max-width:320px;"><div style="max-height:84px; overflow-y:auto; white-space:normal; word-break:break-word; font-size:0.72rem; line-height:1.35; color:var(--text-muted);">${noteHtml}</div></td>
@@ -1595,7 +1597,7 @@ async function exportToExcel(tableType, data) {
         { header: '% Welding', key: 'weldPct', width: 12 },
         { header: 'NDT Progress', key: 'ndtStatus', width: 15 },
         { header: 'Hydrotest Status', key: 'hydroStatus', width: 18 },
-        { header: 'Hydrotest Date', key: 'hydroDate', width: 15 },
+        { header: 'Flange (Done/Total)', key: 'flange', width: 18 },
         { header: 'Reins Status', key: 'reinstStatus', width: 15 },
         { header: 'Re-ins Date', key: 'reinstDate', width: 15 },
         { header: 'Leak Status', key: 'leakStatus', width: 15 },
@@ -1622,7 +1624,9 @@ async function exportToExcel(tableType, data) {
           weldPct: weldPct,
           ndtStatus: p.isNonMetallic ? 'N/A' : ndtPct,
           hydroStatus: computeHydroDisplay(p),
-          hydroDate: hydroDateVal,
+          flange: (p.flangeTotalCount || 0) > 0
+            ? `${p.flangeDoneCount || 0}/${p.flangeTotalCount || 0} (${getProgressPct(p.flangeDoneCount || 0, p.flangeTotalCount || 0)}%)`
+            : 'N/A',
           reinstStatus: p.reinstStatus,
           reinstDate: reinstDateVal,
           leakStatus: p.leakStatus || '-',
@@ -2122,6 +2126,14 @@ async function showTPDetailModal(p) {
           Reins: <small>${p.reinstDate ? formatDate(p.reinstDate) : 'Not Yet'}</small>
         </span>
       </div>
+      <div class="meta-item">
+        <span class="meta-label">Flange (Tightening)</span>
+        <span class="meta-value">
+          ${(p.flangeTotalCount || 0) > 0
+            ? `${p.flangeDoneCount || 0}/${p.flangeTotalCount || 0} (${getProgressPct(p.flangeDoneCount || 0, p.flangeTotalCount || 0)}%)`
+            : `<span style="color:var(--text-faded);">Chưa có dữ liệu flange</span>`}
+        </span>
+      </div>
     </div>
   `;
 
@@ -2212,8 +2224,49 @@ async function showTPDetailModal(p) {
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
       Material ${escapeHtml(nmMat)} not required Welding nor NDT.
     </div>` : '';
-  modalBody.innerHTML = nonMetallicBanner + metaGridHtml + jointsTableHtml;
-  
+  // Flange Management detail table for THIS package (from the local flange_joints table;
+  // present only after the flange upload rebuilt the DB — otherwise silently omitted).
+  let flangeTableHtml = '';
+  try {
+    if (window.LocalDB) {
+      const flrows = window.LocalDB.query(
+        "SELECT spool_no, flange_joint_no, flange_size, flange_rating, flange_type, flange_material, assembled_date, tightened_date FROM flange_joints WHERE UPPER(TRIM(test_package_no))=UPPER(TRIM(?)) ORDER BY spool_no, flange_joint_no",
+        [p.testPackageNo]);
+      if (flrows && flrows.length) {
+        const flDone = flrows.filter(r => String(r.tightened_date || '').trim() !== '').length;
+        const flPct = getProgressPct(flDone, flrows.length);
+        const flRowsHtml = flrows.map(r => {
+          const dn = String(r.tightened_date || '').trim() !== '';
+          return `<tr>
+            <td><strong>${escapeHtml(r.spool_no || '')}</strong></td>
+            <td class="text-center">${escapeHtml(r.flange_joint_no || '')}</td>
+            <td class="text-center">${escapeHtml(r.flange_size || '')}</td>
+            <td class="text-center">${escapeHtml(r.flange_rating || '')}</td>
+            <td class="text-center">${escapeHtml(r.flange_type || '')}</td>
+            <td><small style="color:var(--text-muted);font-size:0.65rem;">${escapeHtml(r.flange_material || '')}</small></td>
+            <td class="text-center">${r.assembled_date ? formatDate(r.assembled_date) : ''}</td>
+            <td class="text-center">${dn ? `<span class="tag done-tag">${formatDate(r.tightened_date)}</span>` : `<span class="tag pending-tag">-</span>`}</td>
+          </tr>`;
+        }).join('');
+        flangeTableHtml = `
+          <h4 style="font-family: var(--font-display); font-size: 0.85rem; color:#ffffff; margin:1.1rem 0 0.6rem; text-transform:uppercase;">Flange Management — Tightening (${flDone}/${flrows.length} · ${flPct}%)</h4>
+          <div class="table-container" style="border-top:1px solid rgba(255,255,255,0.05); max-height:44vh;">
+            <table class="joints-detail-table">
+              <thead><tr>
+                <th style="width:28%;">Spool No</th><th style="width:8%;text-align:center;">Flange</th>
+                <th style="width:8%;text-align:center;">Size</th><th style="width:8%;text-align:center;">Rating</th>
+                <th style="width:8%;text-align:center;">Type</th><th>Material</th>
+                <th style="width:12%;text-align:center;">Assembled</th><th style="width:12%;text-align:center;">Tightened</th>
+              </tr></thead>
+              <tbody>${flRowsHtml}</tbody>
+            </table>
+          </div>`;
+      }
+    }
+  } catch (e) { /* flange_joints not present in older DB */ }
+
+  modalBody.innerHTML = nonMetallicBanner + metaGridHtml + jointsTableHtml + flangeTableHtml;
+
   // Make the modal table columns resizable by user drag
   const modalTable = modalBody.querySelector('table');
   if (modalTable) makeTableResizable(modalTable);

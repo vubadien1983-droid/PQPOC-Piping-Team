@@ -24,6 +24,7 @@
     " s.pt_req AS ptRequiredCount, s.pt_done AS ptDoneCount, s.pmi_req AS pmiRequiredCount," +
     " s.pmi_done AS pmiDoneCount, s.pwht_req AS pwhtRequiredCount, s.pwht_done AS pwhtDoneCount," +
     " s.hardness_req AS hardnessRequiredCount, s.hardness_done AS hardnessDoneCount," +
+    " /*FLANGE*/" +
     " CASE WHEN TRIM(COALESCE(tp.hydro_test,''))<>'' THEN 'Done' ELSE '' END AS hydroStatus," +
     " NULLIF(TRIM(COALESCE(tp.hydro_test,'')),'') AS hydroDate," +
     " CASE WHEN TRIM(COALESCE(tp.reinstatement,''))<>'' THEN 'Done' ELSE '' END AS reinstStatus," +
@@ -35,6 +36,18 @@
     " tp.sign_p07a AS signP07A, tp.inspector AS inspector" +
     " FROM testpack_summary s LEFT JOIN test_packages tp ON s.test_package_no=tp.test_package_no" +
     " ORDER BY s.system, s.test_package_no";
+
+  // Flange management columns exist only after the flange upload rebuilds the DB.
+  // Inject them only when present so older DBs don't error on a missing column.
+  function packagesSql() {
+    var flange = "0 AS flangeTotalCount, 0 AS flangeDoneCount,";
+    try {
+      var cols = window.LocalDB.query("PRAGMA table_info(testpack_summary)").map(function (r) { return r.name; });
+      if (cols.indexOf('flange_total') >= 0)
+        flange = "COALESCE(s.flange_total,0) AS flangeTotalCount, COALESCE(s.flange_done,0) AS flangeDoneCount,";
+    } catch (e) {}
+    return PACKAGES_SQL.replace('/*FLANGE*/', flange);
+  }
 
   var _data = null;   // { packages, daily, live:{ok,list,map}, meta }
   var _origFetch = window.fetch.bind(window);   // native fetch (captured before we override below)
@@ -48,7 +61,7 @@
   function loadData() {
     if (_data) return Promise.resolve(_data);
     return window.LocalDB.ready().then(function () {
-      var packages = LocalDB.query(PACKAGES_SQL);
+      var packages = LocalDB.query(packagesSql());
       var daily = LocalDB.query("SELECT day AS d, weld, rt, paut, mt, pt, ndt FROM daily_progress ORDER BY day");
       var meta = LocalDB.meta();
       // Dia-inch: project total, welded (Visual ACC), and per WELDING-day for the s-curve
@@ -115,7 +128,7 @@
     'ndtRequiredCount', 'ndtDoneCount', 'rtRequiredCount', 'rtDoneCount', 'pautRequiredCount',
     'pautDoneCount', 'mtRequiredCount', 'mtDoneCount', 'ptRequiredCount', 'ptDoneCount',
     'pmiRequiredCount', 'pmiDoneCount', 'pwhtRequiredCount', 'pwhtDoneCount',
-    'hardnessRequiredCount', 'hardnessDoneCount'];
+    'hardnessRequiredCount', 'hardnessDoneCount', 'flangeTotalCount', 'flangeDoneCount'];
 
   function hydroDone(p, live) { var v = live.map.get(String(p.testPackageNo).toUpperCase()); return live.ok ? !!(v && v.hydro) : p.hydroStatus === 'Done'; }
   function reinstDone(p, live) { var v = live.map.get(String(p.testPackageNo).toUpperCase()); return live.ok ? !!(v && v.reinst) : p.reinstStatus === 'Done'; }
