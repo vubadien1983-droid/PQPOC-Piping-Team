@@ -311,17 +311,20 @@
       kpiCard('pa', 'Punch Status', ph.totClosed, ph.tot, '#dc2626', ph.chips) +
       kpiCard('dac', 'DAC (Discipline)', dacN, dacT,'#7c3aed',
         discs2.filter(function (d) { return dAgg[d].cellN; })
-              .map(function (d) { return chip(shortDisc(d), dAgg[d].dacN, dAgg[d].cellN); })) +
-      kpiCard('cssc', 'CSSC (Subsystem)', csscN, list.length, '#059669', csscBySystem(list));
-    // Card DAC/CSSC: click ca card -> modal KPI. Card ITR-A/Punch: click tung chip.
-    el('precom-kpis').querySelectorAll('[data-kpi="dac"],[data-kpi="cssc"]').forEach(function (card) {
-      card.onclick = function () { openKpiModal(card.getAttribute('data-kpi')); };
-    });
+              .map(function (d) { return chipClk(shortDisc(d), dAgg[d].dacN, dAgg[d].cellN, 'data-dacdisc', d); })) +
+      kpiCard('cssc', 'CSSC (Subsystem)', csscN, list.length, '#059669', csscBySubsystem(list));
+    // Tat ca card: click TUNG chip -> modal LOC theo gia tri do (khong click ca card).
     el('precom-kpis').querySelectorAll('[data-discov]').forEach(function (c) {
       c.onclick = function (e) { e.stopPropagation(); openDisciplineModal(c.getAttribute('data-discov')); };
     });
     el('precom-kpis').querySelectorAll('[data-punph]').forEach(function (c) {
       c.onclick = function (e) { e.stopPropagation(); openPunchPhaseModal(c.getAttribute('data-punph'), c.getAttribute('data-puncat')); };
+    });
+    el('precom-kpis').querySelectorAll('[data-dacdisc]').forEach(function (c) {
+      c.onclick = function (e) { e.stopPropagation(); openDisciplineModal(c.getAttribute('data-dacdisc')); };
+    });
+    el('precom-kpis').querySelectorAll('[data-csscss]').forEach(function (c) {
+      c.onclick = function (e) { e.stopPropagation(); openScopeModal({ type: 'ss', ss: c.getAttribute('data-csscss') }); };
     });
 
     var discs = state.disciplines;   // bang chinh LUON hien du cac discipline
@@ -587,6 +590,22 @@
       '<div class="f"><span class="g">' + a.done.toLocaleString() + '</span>/' + a.tot.toLocaleString() +
       ' <span class="' + pctCls(p) + '">' + p + '%</span></div>' +
       '<div class="ab">A ' + a.paC + '/' + a.paT + ' · B ' + a.pbC + '/' + a.pbT + '</div></div>';
+  }
+  // Chip click-duoc + hover (class 'clk') cho DAC/CSSC: data-attr mang gia tri de loc modal.
+  function chipClk(label, closed, total, attr, val) {
+    var p = pct(closed, total);
+    return '<div class="pk-chip clk" ' + attr + '="' + esc(val) + '" title="' + esc(label) +
+      ': ' + closed + '/' + total + ' — click xem chi tiết">' +
+      '<div class="l">' + esc(label) + '</div>' +
+      '<div class="f"><span class="g">' + closed.toLocaleString() + '</span>/' + total.toLocaleString() +
+      ' <span class="' + pctCls(p) + '">' + p + '%</span></div></div>';
+  }
+  // CSSC theo SUBSYSTEM: moi subsystem = 1 chip, nhan dang "11-03" (ssShort bo tien to CPPT-),
+  // gia tri = so discipline DAC-ready / tong discipline cua subsystem do.
+  function csscBySubsystem(list) {
+    return list.map(function (g) {
+      return chipClk(ssShort(g.subsystem), g.dacN, g.discN, 'data-csscss', g.subsystem);
+    });
   }
   function kpiCard(key, label, closed, total, color, chips) {
     var p = pct(closed, total), selCls = (state.kpiSel === key) ? ' sel' : '';
