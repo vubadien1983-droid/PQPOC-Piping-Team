@@ -592,19 +592,23 @@
       '<div class="ab">A ' + a.paC + '/' + a.paT + ' · B ' + a.pbC + '/' + a.pbT + '</div></div>';
   }
   // Chip click-duoc + hover (class 'clk') cho DAC/CSSC: data-attr mang gia tri de loc modal.
-  function chipClk(label, closed, total, attr, val) {
+  // titleText (tuy chon) = noi dung hint hien khi di chuot vao (mac dinh: label + closed/total).
+  function chipClk(label, closed, total, attr, val, titleText) {
     var p = pct(closed, total);
-    return '<div class="pk-chip clk" ' + attr + '="' + esc(val) + '" title="' + esc(label) +
-      ': ' + closed + '/' + total + ' — click xem chi tiết">' +
+    var ttl = titleText || (label + ': ' + closed + '/' + total + ' — click xem chi tiết');
+    return '<div class="pk-chip clk" ' + attr + '="' + esc(val) + '" title="' + esc(ttl) + '">' +
       '<div class="l">' + esc(label) + '</div>' +
       '<div class="f"><span class="g">' + closed.toLocaleString() + '</span>/' + total.toLocaleString() +
       ' <span class="' + pctCls(p) + '">' + p + '%</span></div></div>';
   }
   // CSSC theo SUBSYSTEM: moi subsystem = 1 chip, nhan dang "11-03" (ssShort bo tien to CPPT-),
-  // gia tri = so discipline DAC-ready / tong discipline cua subsystem do.
+  // gia tri = so discipline DAC-ready / tong discipline. Hint khi hover = MA + TEN subsystem.
   function csscBySubsystem(list) {
     return list.map(function (g) {
-      return chipClk(ssShort(g.subsystem), g.dacN, g.discN, 'data-csscss', g.subsystem);
+      var name = String(g.subsystem || '');
+      if (g.desc) name += ' — ' + g.desc;
+      var ttl = name + '  ·  DAC ' + g.dacN + '/' + g.discN + ' discipline — click xem chi tiết';
+      return chipClk(ssShort(g.subsystem), g.dacN, g.discN, 'data-csscss', g.subsystem, ttl);
     });
   }
   function kpiCard(key, label, closed, total, color, chips) {
