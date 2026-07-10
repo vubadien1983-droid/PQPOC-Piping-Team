@@ -1062,8 +1062,11 @@ function renderDetailedTable() {
       ? `<span class="hydro-dash">-</span>`
       : `<span class="status-badge ${hydroBadge}">${hydroDisplay}</span>`;
     const hydroDateText = (hydroDisplay === "Done" && p.hydroDate) ? formatDate(p.hydroDate) : "-";
-    // Flange tightening cell (done/total + %) — coloured like the welding/NDT cells.
-    const flangeCell = ndtCellHtml(p.flangeDoneCount || 0, p.flangeTotalCount || 0);
+    // Flange tightening cell: done/total + % (coloured like welding/NDT). Test packs with
+    // NO flange joints show "-" (not N/A) — flange info is joined from Flange Management Data.
+    const flangeCell = (p.flangeTotalCount || 0) > 0
+      ? ndtCellHtml(p.flangeDoneCount || 0, p.flangeTotalCount || 0)
+      : `<td class="text-center"><span class="hydro-dash">-</span></td>`;
     
     // 4. Reins status badge
     const reinstBadge = p.reinstStatus === "Done" ? 'done' : 'not-yet';
@@ -1626,7 +1629,7 @@ async function exportToExcel(tableType, data) {
           hydroStatus: computeHydroDisplay(p),
           flange: (p.flangeTotalCount || 0) > 0
             ? `${p.flangeDoneCount || 0}/${p.flangeTotalCount || 0} (${getProgressPct(p.flangeDoneCount || 0, p.flangeTotalCount || 0)}%)`
-            : 'N/A',
+            : '-',
           reinstStatus: p.reinstStatus,
           reinstDate: reinstDateVal,
           leakStatus: p.leakStatus || '-',
@@ -2131,7 +2134,7 @@ async function showTPDetailModal(p) {
         <span class="meta-value">
           ${(p.flangeTotalCount || 0) > 0
             ? `${p.flangeDoneCount || 0}/${p.flangeTotalCount || 0} (${getProgressPct(p.flangeDoneCount || 0, p.flangeTotalCount || 0)}%)`
-            : `<span style="color:var(--text-faded);">Chưa có dữ liệu flange</span>`}
+            : `<span style="color:var(--text-faded);">-</span>`}
         </span>
       </div>
     </div>
