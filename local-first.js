@@ -49,7 +49,8 @@
     return PACKAGES_SQL.replace('/*FLANGE*/', flange);
   }
 
-  var _data = null;   // { packages, daily, live:{ok,list,map}, meta }
+  var _data = null, _dataP = null;       // combined (static + live); _dataP = in-flight guard
+  var _static = null, _staticP = null;   // heavy SQLite aggregations (đổi CHỈ khi hot-swap .db.gz)
   var _origFetch = window.fetch.bind(window);   // native fetch (captured before we override below)
   // REAL-TIME hydro/reinst/note come from the LIVE NDT Google Sheet via the DB-free
   // view=live endpoint (CORS-enabled) -- a static GitHub Pages app can't fetch the sheet
@@ -58,9 +59,14 @@
     'https://block-b-piping-fab.vercel.app/api/dashboard-summary?view=live';
   var _liveSig = null;   // signature of the last live payload, to detect sheet changes
 
-  function loadData() {
-    if (_data) return Promise.resolve(_data);
-    return window.LocalDB.ready().then(function () {
+  // ---- HEAVY, pure-SQLite aggregations ---------------------------------------
+  // Các số này (weld/ndt/dia/material...) chỉ đổi khi .db.gz được hot-swap, KHÔNG đổi
+  // theo live sheet. Cache riêng -> live-poll 90s chỉ làm mới hydro/reinst, không phải
+  // chạy lại ~96k-dòng SUM/GROUP BY mỗi lần. _staticP = in-flight guard (chống chạy trùng).
+  function loadStatic() {
+    if (_static)  return Promise.resolve(_static);
+    if (_staticP) return _staticP;
+    _staticP = window.LocalDB.ready().then(function () {
       var packages = LocalDB.query(packagesSql());
       var daily = LocalDB.query("SELECT day AS d, weld, rt, paut, mt, pt, ndt FROM daily_progress ORDER BY day");
       var meta = LocalDB.meta();
@@ -76,12 +82,6 @@
           " WHEN visual_report_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]*' THEN substr(visual_report_date,1,10)" +
           " ELSE NULL END AS day, CAST(dia_in AS REAL) AS dia FROM piping_data WHERE UPPER(visual_acc)='ACC')" +
           " WHERE day IS NOT NULL GROUP BY day");
-      } catch (e) {}
-      // Offline fallback for hydro/reinst = the test_packages baked into the SQLite (as-of-build).
-      var fallback = [];
-      try {
-        fallback = LocalDB.query("SELECT test_package_no AS testPackageNo, hydro_test AS hydro, reinstatement AS reinst FROM test_packages")
-          .map(function (p) { return { testPackageNo: p.testPackageNo, hydro: p.hydro || '', reinst: p.reinst || '', note: '' }; });
       } catch (e) {}
       // Material Progress: per material, completion by JointNo AND by Dia-Inch.
       // done = Visual ACC (metallic = weld visual; non-metallic GRE/CPVC/PPR = bonding visual).
@@ -107,6 +107,22 @@
           " WHERE day IS NOT NULL GROUP BY material, day"
         );
       } catch (e) {}
+      _static = { packages: packages, daily: daily, meta: meta, diaTotal: diaTotal, weldedDia: weldedDia, diaByDay: diaByDay, materialProgress: materialProgress, materialByDay: materialByDay };
+      return _static;
+    }).then(function (s) { _staticP = null; return s; }, function (e) { _staticP = null; throw e; });
+    return _staticP;
+  }
+
+  function loadData() {
+    if (_data)  return Promise.resolve(_data);
+    if (_dataP) return _dataP;   // gộp mọi call đồng thời -> chỉ chạy 1 lần (chống 4x lúc mở app)
+    _dataP = loadStatic().then(function (s) {
+      // Offline fallback for hydro/reinst = the test_packages baked into the SQLite (as-of-build).
+      var fallback = [];
+      try {
+        fallback = LocalDB.query("SELECT test_package_no AS testPackageNo, hydro_test AS hydro, reinstatement AS reinst FROM test_packages")
+          .map(function (p) { return { testPackageNo: p.testPackageNo, hydro: p.hydro || '', reinst: p.reinst || '', note: '' }; });
+      } catch (e) {}
       // Pull the LIVE sheet (real-time); fall back to the SQLite copy if it fails (offline).
       // MUST use the native fetch (_origFetch) -- LIVE_URL contains "/api/", which our own
       // fetch override would otherwise intercept and answer from LocalDB.
@@ -117,10 +133,11 @@
           var list = (liveList && liveList.length) ? liveList : fallback;
           var map = new Map();
           list.forEach(function (p) { map.set(String(p.testPackageNo).toUpperCase(), { hydro: p.hydro || '', reinst: p.reinst || '', note: p.note || '' }); });
-          _data = { packages: packages, daily: daily, live: { ok: list.length > 0, list: list, map: map }, meta: meta, diaTotal: diaTotal, weldedDia: weldedDia, diaByDay: diaByDay, materialProgress: materialProgress, materialByDay: materialByDay };
+          _data = { packages: s.packages, daily: s.daily, live: { ok: list.length > 0, list: list, map: map }, meta: s.meta, diaTotal: s.diaTotal, weldedDia: s.weldedDia, diaByDay: s.diaByDay, materialProgress: s.materialProgress, materialByDay: s.materialByDay };
           return _data;
         });
-    });
+    }).then(function (d) { _dataP = null; return d; }, function (e) { _dataP = null; throw e; });
+    return _dataP;
   }
 
   // ---- builders (mirror the API shapes; same logic as precompute.js) ---------
@@ -303,7 +320,7 @@
         return jsonResponse(buildTotals(d));
       });
     }
-    if (path.indexOf('/api/resync') >= 0) return window.LocalDB.refresh().then(function () { _data = null; return jsonResponse({ ok: true }); });
+    if (path.indexOf('/api/resync') >= 0) return window.LocalDB.refresh().then(function () { _static = null; _staticP = null; _data = null; _dataP = null; return jsonResponse({ ok: true }); });
     return null;   // not an API path
   }
 
@@ -328,7 +345,7 @@
     if (typeof window.setDataStatus === 'function') { try { window.setDataStatus('loading', msg); } catch (e2) {} }
   });
   window.addEventListener('localdb-updated', function () {
-    _data = null;
+    _static = null; _staticP = null; _data = null; _dataP = null;   // DB đổi -> tính lại toàn bộ
     var done = function () { if (typeof window.setDataStatus === 'function') { try { window.setDataStatus('ready', 'Data up to date'); } catch (e) {} } };
     if (typeof window.reloadFreshData === 'function') { try { Promise.resolve(window.reloadFreshData()).then(done, done); } catch (e) { done(); } }
     else done();
@@ -336,12 +353,14 @@
 
   // Real-time hydro/reinst/note: poll the LIVE sheet; if it changed, refresh the view in place.
   setInterval(function () {
+    if (document.hidden) return;   // tab ẩn -> khỏi poll (tiết kiệm tài nguyên, tránh lag khi quay lại)
     _origFetch(LIVE_URL).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
       .then(function (list) {
         if (!list) return;
         var sig = JSON.stringify(list);
         if (_liveSig !== null && sig !== _liveSig) {
-          _liveSig = sig; _data = null;
+          // CHỈ live đổi -> giữ _static (không chạy lại query nặng), chỉ dựng lại phần live.
+          _liveSig = sig; _data = null; _dataP = null;
           if (typeof window.reloadFreshData === 'function') { try { window.reloadFreshData(); } catch (e) {} }
         } else { _liveSig = sig; }
       });

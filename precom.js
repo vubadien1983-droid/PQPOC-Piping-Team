@@ -450,7 +450,7 @@
           return '<tr class="' + (done ? 'done' : '') + '"><td>' + (i + 1) + '</td><td>' + esc(ssShort(r.subsystem)) + '</td>' +
             '<td><b>' + esc(r.tag_no) + '</b></td><td>' + esc(r.tag_desc) + '</td><td>' + esc(r.discipline) + '</td>' +
             '<td>' + esc(r.cs_type) + '</td><td>' + day(r.plan_finish) + '</td>' +
-            '<td>' + (done ? day(r.complete_date) : 'PENDING') + '</td></tr>';
+            '<td>' + (done ? day(r.complete_date) : '') + '</td></tr>';
         }), 800);
     } else if (state.kpiSel === 'pa') {
       var pab = d.pun.filter(function (r) {
@@ -508,7 +508,7 @@
       return '<tr class="' + (done ? 'done' : '') + '"><td>' + (i + 1) + '</td><td><b>' + esc(r.tag_no) + '</b></td>' +
         '<td>' + esc(r.tag_desc) + '</td><td>' + esc(r.discipline) + '</td><td>' + esc(r.cs_type) + '</td>' +
         '<td>' + day(r.plan_start) + '</td><td>' + day(r.plan_finish) + '</td>' +
-        '<td>' + (done ? day(r.complete_date) : 'PENDING') + '</td><td>' + esc(r.norm) + '</td></tr>';
+        '<td>' + (done ? day(r.complete_date) : '') + '</td><td>' + esc(r.norm) + '</td></tr>';
     }).join('');
 
     var punRows = d.pun.map(function (r, i) {
@@ -801,7 +801,7 @@
           '<td><strong>' + esc(r.tag_no) + '</strong></td><td style="font-size:.72rem;">' + esc(r.tag_desc) + '</td>' +
           '<td>' + esc(r.discipline) + '</td><td>' + esc(r.cs_type) + '</td>' +
           '<td>' + esc(String(r.plan_finish || '').slice(0, 10)) + '</td>' +
-          '<td>' + (done ? '<span class="status-badge done">' + esc(String(r.complete_date).slice(0, 10)) + '</span>' : '<span class="status-badge not-yet">Pending</span>') + '</td></tr>';
+          '<td>' + (done ? '<span class="status-badge done">' + esc(String(r.complete_date).slice(0, 10)) + '</span>' : '') + '</td></tr>';
       }).join('') + '</tbody></table></div>';
     modal.style.display = 'flex';
   }
@@ -917,7 +917,7 @@
       return '<tr class="' + (done ? 'done' : '') + '"><td>' + (i + 1) + '</td><td><b>' + esc(r.tag_no) + '</b></td>' +
         '<td>' + esc(r.tag_desc) + '</td><td>' + esc(r.discipline) + '</td><td>' + esc(r.cs_type) + '</td>' +
         '<td>' + _day(r.plan_start) + '</td><td>' + _day(r.plan_finish) + '</td>' +
-        '<td>' + (done ? _day(r.complete_date) : 'PENDING') + '</td><td>' + esc(r.norm) + '</td></tr>';
+        '<td>' + (done ? _day(r.complete_date) : '') + '</td><td>' + esc(r.norm) + '</td></tr>';
     });
     var punRows = d.pun.map(function (r, i) {
       var closed = String(r.status || '').trim().toUpperCase() === 'CLOSED';
@@ -956,7 +956,7 @@
         var done = r.complete_date && String(r.complete_date).trim() !== '';
         return '<tr class="' + (done ? 'done' : '') + '"><td>' + (i + 1) + '</td><td>' + esc(ssShort(r.subsystem)) + '</td>' +
           '<td><b>' + esc(r.tag_no) + '</b></td><td>' + esc(r.tag_desc) + '</td><td>' + esc(r.discipline) + '</td>' +
-          '<td>' + esc(r.cs_type) + '</td><td>' + _day(r.plan_finish) + '</td><td>' + (done ? _day(r.complete_date) : 'PENDING') + '</td></tr>';
+          '<td>' + esc(r.cs_type) + '</td><td>' + _day(r.plan_finish) + '</td><td>' + (done ? _day(r.complete_date) : '') + '</td></tr>';
       });
     } else if (key === 'pa') {
       head = ['#', 'Subsystem', 'PunchNo', 'Cat', 'Phase', 'Status', 'Disc', 'TagNo', 'Defect Description', 'Action By', 'Open', 'Closed'];
@@ -1076,7 +1076,7 @@
         var done = r.complete_date && String(r.complete_date).trim() !== '';
         return '<tr class="' + (done ? 'done' : '') + '"><td>' + (i + 1) + '</td><td>' + esc(ssShort(r.subsystem)) + '</td>' +
           '<td><b>' + esc(r.tag_no) + '</b></td><td>' + esc(r.tag_desc) + '</td><td>' + esc(r.cs_type) + '</td>' +
-          '<td>' + _day(r.plan_finish) + '</td><td>' + (done ? G(_day(r.complete_date)) : 'PENDING') + '</td></tr>';
+          '<td>' + _day(r.plan_finish) + '</td><td>' + (done ? G(_day(r.complete_date)) : '') + '</td></tr>';
       });
     } else if (metric === 'pa' || metric === 'pb') {
       var cat = metric === 'pa' ? 'A' : 'B';
@@ -1244,7 +1244,7 @@
     var head, rows, fill;
     if (key === 'itr') {
       head = ['#', 'Subsystem', 'TagNo', 'Description', 'Disc', 'ITR', 'Plan Finish', 'Complete'];
-      rows = d.itr.map(function (r, i) { return [i + 1, r.subsystem, r.tag_no, r.tag_desc, r.discipline, r.cs_type, _day(r.plan_finish), (r.complete_date && String(r.complete_date).trim() !== '') ? _day(r.complete_date) : 'PENDING']; });
+      rows = d.itr.map(function (r, i) { return [i + 1, r.subsystem, r.tag_no, r.tag_desc, r.discipline, r.cs_type, _day(r.plan_finish), (r.complete_date && String(r.complete_date).trim() !== '') ? _day(r.complete_date) : '']; });
       fill = function (ri) { var r = d.itr[ri]; return (r.complete_date && String(r.complete_date).trim() !== '') ? 'FFE6F6EC' : null; };
     } else if (key === 'pa') {
       head = ['#', 'Subsystem', 'PunchNo', 'Cat', 'Phase', 'Status', 'Disc', 'TagNo', 'Defect Description', 'Action By', 'Open', 'Closed'];

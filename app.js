@@ -194,7 +194,8 @@ document.addEventListener('DOMContentLoaded', () => {
   initTabs();
   setupEventListeners();
   loadAnalyticsDashboard();
-  fetchDatabase();
+  // fetchDatabase() KHÔNG gọi lúc mở app: tab Database ẩn + tự lazy-load trong initDatabaseTab()
+  // khi người dùng mở tab. Bỏ 1 lượt COUNT+JOIN+render 96k dòng vô ích lúc khởi động.
   loadSyncMeta();
   startFreshnessWatcher();
 });
@@ -218,6 +219,7 @@ function setDataStatus(kind, text) {
 // is never silently left looking at stale data.
 function startFreshnessWatcher() {
   setInterval(async () => {
+    if (document.hidden) return;   // tab ẩn -> khỏi poll sync-meta
     try {
       const res = await fetch(getApiUrl('/api/dashboard-summary?view=syncmeta&_cb=' + Date.now()));
       if (!res.ok) return;

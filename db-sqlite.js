@@ -84,8 +84,11 @@
     // (that memory spike could stall/OOM weaker devices during a data hot-swap).
     if (_db) { try { _db.close(); } catch (e) {} _db = null; }
     _db = new _SQL.Database(raw);
-    _indexed = false;   // indexes are built LAZILY (LocalDB.ensureIndexes) only when the AI tab
-                        // needs them -- NOT during load -- so opening the app stays fast/light.
+    _indexed = false;   // heavy pairing indexes (idx_dwg_joint...) still built LAZILY by the AI tab.
+    // Nhưng index cho JOIN/filter tab Database (test_package_no, material) build NGAY -> mọi query
+    // Database/dropdown/joints không còn full-scan ~96k dòng. Rẻ (~vài trăm ms, 1 lần/lần load).
+    try { _db.exec('CREATE INDEX IF NOT EXISTS idx_tp ON piping_data (test_package_no);' +
+                   'CREATE INDEX IF NOT EXISTS idx_material ON piping_data (material);'); } catch (e) {}
     _meta = {};
     try { var r = _db.exec('SELECT key, value FROM app_meta'); if (r[0]) r[0].values.forEach(function (row) { _meta[row[0]] = row[1]; }); } catch (e) {}
   }
@@ -229,5 +232,5 @@
   // Auto pick-up new data pushed by the desktop uploader, WHILE the app is open: re-check the
   // .db.gz every few minutes (a conditional ETag request -> cheap 304 when unchanged, silent
   // hot-swap + 'localdb-updated' when newer). Without this the app only checked on (re)load.
-  setInterval(function () { if (_db) { try { window.LocalDB.refresh(); } catch (e) {} } }, 180000);
+  setInterval(function () { if (_db && !document.hidden) { try { window.LocalDB.refresh(); } catch (e) {} } }, 180000);
 })();
