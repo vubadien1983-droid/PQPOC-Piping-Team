@@ -938,46 +938,106 @@
       (rows.join('') || '<tr><td colspan="' + head.length + '" style="text-align:center;padding:1rem;">Không có dữ liệu.</td></tr>') +
       '</tbody></table>';
   }
+  // Thanh TONG HOP theo DISCIPLINE trong modal (Punch / CSSC). Moi o = 1 discipline (kem 'Tất cả'),
+  // hien a/b + %. Click -> loc bang duoi. Tai dung style .pcm-kbox (da co hover + .sel).
+  //   items: [{disc:'' , a, b}(Tất cả), {disc, a, b}, ...]
+  function pcmDiscBar(items, active) {
+    return '<div class="pcm-kpis pcm-dfbar">' + items.map(function (it) {
+      var isAll = (String(it.disc) === '');
+      var sel = (String(it.disc) === String(active || '')) ? ' sel' : '';
+      var p = pct(it.a, it.b);
+      return '<div class="pcm-kbox clk' + sel + '" data-df="' + esc(it.disc) +
+        '" style="border-top:3px solid ' + (isAll ? '#64748b' : '#0369a1') + ';" title="' +
+        esc(isAll ? 'Tất cả discipline — click bỏ lọc' : it.disc + ' — click lọc bảng theo discipline này') + '">' +
+        '<div class="kl">' + esc(isAll ? 'TẤT CẢ' : shortDisc(it.disc)) + '</div>' +
+        '<div class="kf"><span class="kdone">' + it.a + '</span> / ' + it.b + '</div>' +
+        '<div class="kp ' + pctCls(p) + '">' + p + '%</div></div>';
+    }).join('') + '</div>';
+  }
+  // Gom du lieu theo discipline -> mang items cho pcmDiscBar. rows=du lieu; discOf(r)=ten discipline;
+  // isA(r)=dem tu so 'a' (vd Closed / Done). 'Tất cả' o dau.
+  function discBarItems(rows, discOf, isA) {
+    var m = {}, order = [], totA = 0;
+    rows.forEach(function (r) {
+      var dsc = String(discOf(r) || '').trim() || '(trống)';
+      if (!m[dsc]) { m[dsc] = { disc: dsc, a: 0, b: 0 }; order.push(dsc); }
+      m[dsc].b++; if (isA(r)) { m[dsc].a++; totA++; }
+    });
+    order.sort();
+    var items = [{ disc: '', a: totA, b: rows.length }];
+    order.forEach(function (d) { items.push(m[d]); });
+    return items;
+  }
+  var _dfilter = null;   // { render: function(disc){...} } — modal Punch/CSSC loc theo discipline
+  function wireDiscFilter(scopeEl) {
+    (scopeEl || el('pcm-body')).querySelectorAll('[data-df]').forEach(function (c) {
+      c.onclick = function () { if (_dfilter) _dfilter.render(c.getAttribute('data-df')); };
+    });
+  }
+  function sameDisc(r, disc) {
+    return (String(r.discipline || '').trim() || '(trống)') === disc;
+  }
 
   // ---- Modal cho 1 PHAM VI (o discipline / subsystem / system) ----
   function openScopeModal(sel) {
     var sc = scopeWhereFor(sel, state.system), d = detailQueries(sc), label = scopeLabelFor(sel);
-    var itDone = 0; d.itr.forEach(function (r) { if (r.complete_date && String(r.complete_date).trim() !== '') itDone++; });
-    var paT = 0, paC = 0, pbT = 0, pbC = 0;
+    function itrRowsHtml(list) {
+      return list.map(function (r, i) {
+        var done = r.complete_date && String(r.complete_date).trim() !== '';
+        return '<tr class="' + (done ? 'done' : '') + '"><td>' + (i + 1) + '</td><td><b>' + esc(r.tag_no) + '</b></td>' +
+          '<td>' + esc(r.tag_desc) + '</td><td>' + esc(r.discipline) + '</td><td>' + esc(r.cs_type) + '</td>' +
+          '<td>' + _day(r.plan_start) + '</td><td>' + _day(r.plan_finish) + '</td>' +
+          '<td>' + (done ? _day(r.complete_date) : '') + '</td><td>' + esc(r.norm) + '</td></tr>';
+      });
+    }
+    function punRowsHtml(list) {
+      return list.map(function (r, i) {
+        var closed = String(r.status || '').trim().toUpperCase() === 'CLOSED';
+        var openA = !closed && String(r.category || '').trim().toUpperCase() === 'A';
+        return '<tr class="' + (closed ? 'done' : (openA ? 'opa' : '')) + '"><td>' + (i + 1) + '</td>' +
+          '<td><b>' + esc(r.punch_no) + '</b></td><td style="text-align:center;font-weight:800;">' + esc(r.category) + '</td>' +
+          '<td>' + esc(r.phase) + '</td><td>' + esc(r.status) + '</td><td>' + esc(r.discipline) + '</td><td>' + esc(r.tag_no) + '</td>' +
+          '<td style="min-width:220px;white-space:normal;">' + esc(String(r.description || '')) + '</td>' +
+          '<td>' + esc(r.action_by) + '</td><td>' + _day(r.open_date) + '</td><td>' + _day(r.closed_date) + '</td><td>' + _day(r.expected_date) + '</td></tr>';
+      });
+    }
+    // TONG HOP theo DISCIPLINE: a = ITR-A done, b = ITR-A total. Gom ca discipline chi co Punch.
+    var im = {}, order = [], totDone = 0;
+    d.itr.forEach(function (r) {
+      var dsc = String(r.discipline || '').trim() || '(trống)';
+      if (!im[dsc]) { im[dsc] = { disc: dsc, a: 0, b: 0 }; order.push(dsc); }
+      im[dsc].b++;
+      if (r.complete_date && String(r.complete_date).trim() !== '') { im[dsc].a++; totDone++; }
+    });
     d.pun.forEach(function (r) {
-      var cat = String(r.category || '').trim().toUpperCase(), cl = String(r.status || '').trim().toUpperCase() === 'CLOSED';
-      if (cat === 'A') { paT++; if (cl) paC++; } else if (cat === 'B') { pbT++; if (cl) pbC++; }
+      var dsc = String(r.discipline || '').trim() || '(trống)';
+      if (!im[dsc]) { im[dsc] = { disc: dsc, a: 0, b: 0 }; order.push(dsc); }
     });
-    var itrRows = d.itr.map(function (r, i) {
-      var done = r.complete_date && String(r.complete_date).trim() !== '';
-      return '<tr class="' + (done ? 'done' : '') + '"><td>' + (i + 1) + '</td><td><b>' + esc(r.tag_no) + '</b></td>' +
-        '<td>' + esc(r.tag_desc) + '</td><td>' + esc(r.discipline) + '</td><td>' + esc(r.cs_type) + '</td>' +
-        '<td>' + _day(r.plan_start) + '</td><td>' + _day(r.plan_finish) + '</td>' +
-        '<td>' + (done ? _day(r.complete_date) : '') + '</td><td>' + esc(r.norm) + '</td></tr>';
-    });
-    var punRows = d.pun.map(function (r, i) {
-      var closed = String(r.status || '').trim().toUpperCase() === 'CLOSED';
-      var openA = !closed && String(r.category || '').trim().toUpperCase() === 'A';
-      return '<tr class="' + (closed ? 'done' : (openA ? 'opa' : '')) + '"><td>' + (i + 1) + '</td>' +
-        '<td><b>' + esc(r.punch_no) + '</b></td><td style="text-align:center;font-weight:800;">' + esc(r.category) + '</td>' +
-        '<td>' + esc(r.phase) + '</td><td>' + esc(r.status) + '</td><td>' + esc(r.discipline) + '</td><td>' + esc(r.tag_no) + '</td>' +
-        '<td style="min-width:220px;white-space:normal;">' + esc(String(r.description || '')) + '</td>' +
-        '<td>' + esc(r.action_by) + '</td><td>' + _day(r.open_date) + '</td><td>' + _day(r.closed_date) + '</td><td>' + _day(r.expected_date) + '</td></tr>';
-    });
+    order.sort();
+    var items = [{ disc: '', a: totDone, b: d.itr.length }];
+    order.forEach(function (k) { items.push(im[k]); });
+
     showModal();
     el('pcm-title').textContent = 'Chi tiết: ' + label;
-    el('pcm-sub').textContent = 'ITR-A ' + d.itr.length + ' dòng · Punch ' + d.pun.length + ' dòng';
     el('pcm-body').innerHTML =
-      '<div class="pcm-kpis">' +
-        kbox('ITR-A Done', itDone, d.itr.length, '#0369a1') +
-        kbox('Punch A Closed', paC, paT, '#dc2626') +
-        kbox('Punch B Closed', pbC, pbT, '#d97706') + '</div>' +
-      '<div class="pcm-chartbox"><canvas id="pcm-chart"></canvas></div>' +
-      reportTable('ITR-A Checksheets', ['#', 'TagNo', 'Description', 'Disc', 'ITR', 'Plan Start', 'Plan Finish', 'Complete', 'Norm'], itrRows) +
-      reportTable('Punch List  (đỏ = Cat A Open · xanh = Closed)', ['#', 'PunchNo', 'Cat', 'Phase', 'Status', 'Disc', 'TagNo', 'Defect Description', 'Action By', 'Open', 'Closed', 'Expected'], punRows);
+      '<div class="pcm-chartbox"><canvas id="pcm-chart"></canvas></div><div id="pcm-dfwrap"></div>';
     if (_mchart) { try { _mchart.destroy(); } catch (e) {} _mchart = null; }
     _mchart = drawSCurve(el('pcm-chart'), sc);
-    el('pcm-export').onclick = function () { exportScope(label, d); };
+
+    function render(disc) {
+      var fitr = disc ? d.itr.filter(function (r) { return sameDisc(r, disc); }) : d.itr;
+      var fpun = disc ? d.pun.filter(function (r) { return sameDisc(r, disc); }) : d.pun;
+      el('pcm-sub').textContent = 'ITR-A ' + fitr.length + ' dòng · Punch ' + fpun.length + ' dòng' +
+        (disc ? ' · Discipline: ' + disc : ' · Tất cả discipline');
+      el('pcm-dfwrap').innerHTML =
+        pcmDiscBar(items, disc) +
+        reportTable('ITR-A Checksheets', ['#', 'TagNo', 'Description', 'Disc', 'ITR', 'Plan Start', 'Plan Finish', 'Complete', 'Norm'], itrRowsHtml(fitr)) +
+        reportTable('Punch List  (đỏ = Cat A Open · xanh = Closed)', ['#', 'PunchNo', 'Cat', 'Phase', 'Status', 'Disc', 'TagNo', 'Defect Description', 'Action By', 'Open', 'Closed', 'Expected'], punRowsHtml(fpun));
+      wireDiscFilter(el('pcm-dfwrap'));
+      el('pcm-export').onclick = function () { exportScope(label + (disc ? ' · ' + disc : ''), { itr: fitr, pun: fpun }); };
+    }
+    _dfilter = { render: render };
+    render('');
   }
 
   // ---- Modal cho 1 KPI (itr / pa / dac / cssc) ----
@@ -1177,24 +1237,37 @@
     var closed = rows.filter(function (r) { return String(r.status || '').trim().toUpperCase() === 'CLOSED'; }).length;
     showModal();
     el('pcm-title').textContent = 'Punch ' + phase + '_' + cat;
-    el('pcm-sub').textContent = (state.system === '__ALL__' ? 'Toàn dự án' : 'System ' + state.system) +
-      ' · Cat ' + cat + ' · Phase ' + phase + ' · ' + rows.length + ' punch (Closed ' + closed + ')';
-    el('pcm-body').innerHTML =
-      '<div class="pcm-kpis">' +
-        kbox('Đã Closed', closed, rows.length, '#059669') +
-        kbox('Còn Open', rows.length - closed, rows.length, '#dc2626') + '</div>' +
-      reportTable('Punch ' + phase + '_' + cat + '  (đỏ = Open · xanh = Closed)',
-        ['#', 'System', 'Subsystem', 'PunchNo', 'Discipline', 'Phase', 'Status', 'TagNo', 'Defect Description', 'Action By', 'Open', 'Closed', 'Expected'],
-        rows.map(function (r, i) {
-          var cl = String(r.status || '').trim().toUpperCase() === 'CLOSED';
-          return '<tr class="' + (cl ? 'done' : 'opa') + '"><td>' + (i + 1) + '</td><td>' + esc(r.system_no) + '</td><td>' + esc(ssShort(r.subsystem)) + '</td>' +
-            '<td><b>' + esc(r.punch_no) + '</b></td><td>' + esc(r.discipline) + '</td><td>' + esc(r.phase) + '</td>' +
-            '<td>' + (cl ? '<span style="color:#059669;font-weight:700;">' + esc(r.status) + '</span>' : esc(r.status)) + '</td>' +
-            '<td>' + esc(r.tag_no) + '</td><td style="min-width:220px;white-space:normal;">' + esc(String(r.description || '')) + '</td>' +
-            '<td>' + esc(r.action_by) + '</td><td>' + _day(r.open_date) + '</td><td>' + _day(r.closed_date) + '</td><td>' + _day(r.expected_date) + '</td></tr>';
-        }));
+    // TONG HOP theo DISCIPLINE: a = Closed, b = tong punch cua discipline. Click -> loc bang duoi.
+    var items = discBarItems(rows,
+      function (r) { return r.discipline; },
+      function (r) { return String(r.status || '').trim().toUpperCase() === 'CLOSED'; });
+    el('pcm-body').innerHTML = '<div id="pcm-dfwrap"></div>';
     if (_mchart) { try { _mchart.destroy(); } catch (e) {} _mchart = null; }
-    el('pcm-export').onclick = function () { exportPunchPhase(phase, cat, rows); };
+
+    function punRowHtml(r, i) {
+      var cl = String(r.status || '').trim().toUpperCase() === 'CLOSED';
+      return '<tr class="' + (cl ? 'done' : 'opa') + '"><td>' + (i + 1) + '</td><td>' + esc(r.system_no) + '</td><td>' + esc(ssShort(r.subsystem)) + '</td>' +
+        '<td><b>' + esc(r.punch_no) + '</b></td><td>' + esc(r.discipline) + '</td><td>' + esc(r.phase) + '</td>' +
+        '<td>' + (cl ? '<span style="color:#059669;font-weight:700;">' + esc(r.status) + '</span>' : esc(r.status)) + '</td>' +
+        '<td>' + esc(r.tag_no) + '</td><td style="min-width:220px;white-space:normal;">' + esc(String(r.description || '')) + '</td>' +
+        '<td>' + esc(r.action_by) + '</td><td>' + _day(r.open_date) + '</td><td>' + _day(r.closed_date) + '</td><td>' + _day(r.expected_date) + '</td></tr>';
+    }
+    function render(disc) {
+      var fr = disc ? rows.filter(function (r) { return sameDisc(r, disc); }) : rows;
+      var cl = fr.filter(function (r) { return String(r.status || '').trim().toUpperCase() === 'CLOSED'; }).length;
+      el('pcm-sub').textContent = (state.system === '__ALL__' ? 'Toàn dự án' : 'System ' + state.system) +
+        ' · Cat ' + cat + ' · Phase ' + phase + ' · ' + fr.length + ' punch (Closed ' + cl + ')' +
+        (disc ? ' · Discipline: ' + disc : ' · Tất cả discipline');
+      el('pcm-dfwrap').innerHTML =
+        pcmDiscBar(items, disc) +
+        reportTable('Punch ' + phase + '_' + cat + '  (đỏ = Open · xanh = Closed)',
+          ['#', 'System', 'Subsystem', 'PunchNo', 'Discipline', 'Phase', 'Status', 'TagNo', 'Defect Description', 'Action By', 'Open', 'Closed', 'Expected'],
+          fr.map(punRowHtml));
+      wireDiscFilter(el('pcm-dfwrap'));
+      el('pcm-export').onclick = function () { exportPunchPhase(phase, cat, fr); };
+    }
+    _dfilter = { render: render };
+    render('');
   }
   function exportPunchPhase(phase, cat, rows) {
     var sub = _rptSub('Punch ' + phase + '_' + cat + (state.system === '__ALL__' ? '' : ' · System ' + state.system));
