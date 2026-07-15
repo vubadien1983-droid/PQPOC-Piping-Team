@@ -326,6 +326,7 @@
     el('precom-kpis').querySelectorAll('[data-csscss]').forEach(function (c) {
       c.onclick = function (e) { e.stopPropagation(); openScopeModal({ type: 'ss', ss: c.getAttribute('data-csscss') }); };
     });
+    wireChipTips();   // tooltip tuy bien (hien ngay) cho chip CSSC co data-tip
 
     var discs = state.disciplines;   // bang chinh LUON hien du cac discipline
     var nCols = 1 + discs.length * 3 + 1;
@@ -593,22 +594,57 @@
   }
   // Chip click-duoc + hover (class 'clk') cho DAC/CSSC: data-attr mang gia tri de loc modal.
   // titleText (tuy chon) = noi dung hint hien khi di chuot vao (mac dinh: label + closed/total).
-  function chipClk(label, closed, total, attr, val, titleText) {
+  // tipMode=true -> gan vao data-tip (tooltip TUY BIEN hien ngay, khong tre nhu native title).
+  function chipClk(label, closed, total, attr, val, titleText, tipMode) {
     var p = pct(closed, total);
     var ttl = titleText || (label + ': ' + closed + '/' + total + ' — click xem chi tiết');
-    return '<div class="pk-chip clk" ' + attr + '="' + esc(val) + '" title="' + esc(ttl) + '">' +
+    var hint = tipMode ? ('data-tip="' + esc(ttl) + '"') : ('title="' + esc(ttl) + '"');
+    return '<div class="pk-chip clk" ' + attr + '="' + esc(val) + '" ' + hint + '>' +
       '<div class="l">' + esc(label) + '</div>' +
       '<div class="f"><span class="g">' + closed.toLocaleString() + '</span>/' + total.toLocaleString() +
       ' <span class="' + pctCls(p) + '">' + p + '%</span></div></div>';
   }
   // CSSC theo SUBSYSTEM: moi subsystem = 1 chip, nhan dang "11-03" (ssShort bo tien to CPPT-),
-  // gia tri = so discipline DAC-ready / tong discipline. Hint khi hover = MA + TEN subsystem.
+  // gia tri = so discipline DAC-ready / tong discipline. Hover -> tooltip tuy bien: MA + TEN subsystem.
   function csscBySubsystem(list) {
     return list.map(function (g) {
       var name = String(g.subsystem || '');
       if (g.desc) name += ' — ' + g.desc;
       var ttl = name + '  ·  DAC ' + g.dacN + '/' + g.discN + ' discipline — click xem chi tiết';
-      return chipClk(ssShort(g.subsystem), g.dacN, g.discN, 'data-csscss', g.subsystem, ttl);
+      return chipClk(ssShort(g.subsystem), g.dacN, g.discN, 'data-csscss', g.subsystem, ttl, true);
+    });
+  }
+  // Tooltip tuy bien cho chip co data-tip (hien NGAY, position:fixed nen khong bi cat boi vung cuon).
+  function ensureChipTip() {
+    if (ensureChipTip._el) return ensureChipTip._el;
+    var t = document.createElement('div');
+    t.className = 'pcm-chip-tip';
+    t.style.cssText = 'position:fixed;z-index:100002;pointer-events:none;display:none;max-width:340px;' +
+      'background:#0f2647;color:#fff;border:1px solid #2b4b7a;border-radius:6px;padding:6px 9px;' +
+      'font-size:0.72rem;line-height:1.4;box-shadow:0 6px 18px rgba(0,0,0,.45);white-space:normal;';
+    document.body.appendChild(t);
+    ensureChipTip._el = t;
+    return t;
+  }
+  function wireChipTips() {
+    var host = el('precom-kpis');
+    if (!host || host._tipWired) return;
+    host._tipWired = true;
+    host.addEventListener('mouseover', function (e) {
+      var c = e.target.closest('[data-tip]'); if (!c) return;
+      var t = ensureChipTip(); t.textContent = c.getAttribute('data-tip'); t.style.display = 'block';
+    });
+    host.addEventListener('mousemove', function (e) {
+      var t = ensureChipTip._el; if (!t || t.style.display === 'none') return;
+      var x = e.clientX + 14, y = e.clientY + 16;
+      if (x + t.offsetWidth > window.innerWidth - 8) x = window.innerWidth - 8 - t.offsetWidth;
+      if (y + t.offsetHeight > window.innerHeight - 8) y = e.clientY - 16 - t.offsetHeight;
+      t.style.left = x + 'px'; t.style.top = y + 'px';
+    });
+    host.addEventListener('mouseout', function (e) {
+      var c = e.target.closest('[data-tip]'); if (!c) return;
+      if (e.relatedTarget && c.contains(e.relatedTarget)) return;
+      if (ensureChipTip._el) ensureChipTip._el.style.display = 'none';
     });
   }
   function kpiCard(key, label, closed, total, color, chips) {
