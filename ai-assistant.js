@@ -16,13 +16,7 @@
   var JSON_HEADERS = { 'Content-Type': 'application/json' };
   var STORE_KEY = 'pqpoc_ai_chats_v1';
 
-  var EXAMPLES = [
-    'Đánh giá tổng thể tiến độ NDT theo system và chỉ ra điểm nghẽn',
-    'Dự đoán khi nào hoàn thành welding theo tiến độ hiện tại (kèm dẫn chứng)',
-    'Liệt kê các test pack đã ready for hydrotest',
-    'Các mối đang sót PWHT — gồm Test pack, Line, SpoolNo, JointNo',
-    'PWHT là gì và khi nào bắt buộc phải làm?'
-  ];
+  var EXAMPLES = [];   // bo cac chip goi y (theo yeu cau user)
 
   // ---- Live Google-Sheet rows loaded into the local `testpack_sheet` table when the tab is used.
   var _sheetAt = 0;
