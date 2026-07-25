@@ -192,6 +192,25 @@
   // Leak Test coi là đã "test xong" khi cột Testing có dữ liệu (Done). Hiện chưa có -> false.
   function _testingDone(v) { var s = String(v == null ? '' : v).trim().toUpperCase(); return s !== '' && s !== '-' && s !== 'N/A'; }
 
+  // ---- Ngày kế hoạch (LTP Timeline): Start (dd-Mmm-yy) + Days -> Finish = Start + Days ----
+  var _MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  var _MON_I = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+  function _parseDate(s) {
+    if (!s) return null;
+    if (s instanceof Date) return isNaN(s) ? null : s;
+    if (typeof s === 'number') { var e = new Date(Date.UTC(1899, 11, 30) + s * 86400000); return isNaN(e) ? null : e; } // Excel serial
+    var str = String(s).trim();
+    var m = str.match(/^(\d{1,2})[-\/ ]([A-Za-z]{3})[-\/ ](\d{2,4})$/);           // 10-Nov-26
+    if (m) { var y = +m[3]; if (y < 100) y += 2000; var mi = _MON_I[m[2].toLowerCase()]; if (mi != null) return new Date(y, mi, +m[1]); }
+    var d = new Date(str); return isNaN(d) ? null : d;
+  }
+  function _fmtDate(d) {
+    if (!d || isNaN(d)) return '';
+    var dd = d.getDate();
+    return (dd < 10 ? '0' : '') + dd + '-' + _MON[d.getMonth()] + '-' + String(d.getFullYear()).slice(-2);
+  }
+  function _addDays(d, n) { if (!d) return null; var x = new Date(d.getTime()); x.setDate(x.getDate() + (+n || 0)); return x; }
+
   /* ---------------------------------------------------------------------- *
    * 3. TỔNG HỢP theo từng Leak Test package.
    * ---------------------------------------------------------------------- */
@@ -214,6 +233,11 @@
       });
       var loc = _parseLoc(lt);
       var testing = lt.testing || '';   // chưa có dữ liệu thực hiện Leak Test
+      // Kế hoạch từ LTP Timeline: planStart (Start) + days (Days) -> finish = start + days.
+      var _ps = _parseDate(lt.planStart);
+      var _days = (lt.days != null && lt.days !== '') ? (+lt.days || 0) : null;
+      var planStartStr = _ps ? _fmtDate(_ps) : (lt.planStart || '');
+      var finishStr = (_ps && _days != null) ? _fmtDate(_addDays(_ps, _days)) : '';
       return {
         no: i + 1,
         leakTestNo: lt.leakTestNo || ('LT-' + (i + 1)),
@@ -230,7 +254,8 @@
         // Readiness: TẤT CẢ hydrotest con đều Ready (đủ 3 ĐK) và có ít nhất 1 gói.
         readiness: total > 0 && readyCount === total,
         testing: testing,
-        testingDone: _testingDone(testing)
+        testingDone: _testingDone(testing),
+        planStart: planStartStr, days: _days, finishDate: finishStr
       };
     });
   }
@@ -420,7 +445,7 @@
   function renderTable() {
     var tb = document.getElementById('lt-table-body'); if (!tb) return;
     if (!state.filtered.length) {
-      tb.innerHTML = '<tr><td colspan="7" class="lt-empty" style="padding:2rem;">Không có Leak Test nào khớp bộ lọc.</td></tr>';
+      tb.innerHTML = '<tr><td colspan="9" class="lt-empty" style="padding:2rem;">Không có Leak Test nào khớp bộ lọc.</td></tr>';
       return;
     }
     var rows = state.filtered.map(function (r, idx) {
@@ -433,6 +458,8 @@
         _fracCell(r.punchClosed, r.punchTotal, 'hydro-bar') +    // Punch A: closed/total
         _fracCell(r.flangeDone, r.flangeTotal, 'ndt-bar') +      // Flange management: done/total
         '<td class="text-center">' + readyCell + '</td>' +
+        '<td class="text-center">' + (r.planStart || '-') + '</td>' +
+        '<td class="text-center">' + (r.finishDate || '-') + '</td>' +
         '<td class="text-center">' + (r.testing || '-') + '</td>' +
         '</tr>';
     }).join('');
@@ -653,14 +680,16 @@
       { header: 'Sum Hydrotest', key: 'sum', width: 13 }, { header: '% Ready', key: 'rpct', width: 9, type: 'pct' },
       { header: 'Punch A', key: 'pu', width: 12 }, { header: '% Punch A', key: 'ppct', width: 10, type: 'pct' },
       { header: 'Flange', key: 'fl', width: 12 }, { header: '% Flange', key: 'fpct', width: 9, type: 'pct' },
-      { header: 'Readiness', key: 'ready', width: 11, type: 'status' }, { header: 'Testing', key: 'testing', width: 10 }
+      { header: 'Readiness', key: 'ready', width: 11, type: 'status' },
+      { header: 'Plan Start', key: 'pstart', width: 12 }, { header: 'Days', key: 'days', width: 6 }, { header: 'Finish Date', key: 'finish', width: 12 },
+      { header: 'Testing', key: 'testing', width: 10 }
     ];
     var rows = data.map(function (r, i) {
       return { no: i + 1, lt: r.leakTestNo, sys: r.system, sysno: r.systemNo, subno: r.subsystemNo,
         sum: r.readyCount + '/' + r.totalCount, rpct: r.readyPct / 100,
         pu: r.punchClosed + '/' + r.punchTotal, ppct: r.punchPct / 100,
         fl: r.flangeDone + '/' + r.flangeTotal, fpct: r.flangePct / 100,
-        ready: r.readiness ? 'Ready' : '', testing: r.testing || '' };
+        ready: r.readiness ? 'Ready' : '', pstart: r.planStart || '', days: (r.days != null ? r.days : ''), finish: r.finishDate || '', testing: r.testing || '' };
     });
     var parts = ['LeakTest'];
     if (state.subsystemFilter) parts.push(_safe(state.subsystemFilter));
@@ -756,7 +785,7 @@
     state.loaded = true;
     wireControls();
     var body = document.getElementById('lt-table-body');
-    if (body) body.innerHTML = '<tr><td colspan="7" class="lt-empty" style="padding:2rem;"><div class="loading-spinner-small"></div><p style="margin-top:.6rem;">Đang dựng lookup Maps…</p></td></tr>';
+    if (body) body.innerHTML = '<tr><td colspan="9" class="lt-empty" style="padding:2rem;"><div class="loading-spinner-small"></div><p style="margin-top:.6rem;">Đang dựng lookup Maps…</p></td></tr>';
     buildLeakTestLookupMap().then(function () {
       // DEMO: chưa nạp LEAK_TEST_DATA thật -> tự gom Hydrotest theo prefix system để test UI.
       // Xoá/không dùng khi đã có window.LEAK_TEST_DATA thật.
@@ -768,7 +797,7 @@
       renderAll();
     }).catch(function (e) {
       console.error('[LeakTest] init fail:', e);
-      if (body) body.innerHTML = '<tr><td colspan="7" class="lt-empty" style="padding:2rem;color:#f43f5e;">Lỗi tải dữ liệu Leak Test.</td></tr>';
+      if (body) body.innerHTML = '<tr><td colspan="9" class="lt-empty" style="padding:2rem;color:#f43f5e;">Lỗi tải dữ liệu Leak Test.</td></tr>';
     });
   };
 
