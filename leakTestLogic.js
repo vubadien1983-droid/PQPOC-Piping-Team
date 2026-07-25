@@ -259,7 +259,36 @@
     renderChart();
     renderDetailPanel();
     renderTable();
+    updateLeakDashCard();
   }
+
+  // Tổng quan cho ô "Leak Test Packages" ở Dashboard Zone 1: Done (đã test xong) / tổng + %.
+  function _leakSummary() {
+    if (state.leakRows && state.leakRows.length) {
+      var done = state.leakRows.filter(function (r) { return r.testingDone; }).length;
+      return { done: done, total: state.leakRows.length, pct: _pct(done, state.leakRows.length) };
+    }
+    var d = window.LEAK_TEST_DATA;
+    if (d && d.length) {
+      var dn = d.filter(function (lt) { return _testingDone(lt.testing); }).length;
+      return { done: dn, total: d.length, pct: _pct(dn, d.length) };
+    }
+    return null;
+  }
+  window.LeakTestSummary = _leakSummary;
+
+  function updateLeakDashCard() {
+    var s = _leakSummary(); if (!s) return;
+    var val = document.getElementById('z1-leak-val');
+    var pctEl = document.getElementById('z1-leak-pct');
+    var bar = document.getElementById('z1-leak-bar');
+    var note = document.getElementById('z1-leak-note');
+    if (val) val.textContent = s.done.toLocaleString() + ' / ' + s.total.toLocaleString();
+    if (pctEl) { pctEl.style.display = ''; pctEl.textContent = s.pct + '%'; pctEl.className = 'stat-pct ' + (window.pctClass ? window.pctClass(s.pct) : ''); }
+    if (bar) { if (bar.parentElement) bar.parentElement.style.display = ''; bar.style.width = s.pct + '%'; }
+    if (note) note.style.display = 'none';
+  }
+  window.updateLeakDashCard = updateLeakDashCard;
 
   // Sidebar: BẢNG theo Subsystem — cột System / System No / Subsystem No / Test pack (Done/Total + %).
   // Test pack Done = số leak test đã test xong (Testing done) trong subsystem đó. Gom O(n) bằng Map.

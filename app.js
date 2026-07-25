@@ -2660,19 +2660,21 @@ function renderDashboardZones() {
     else { hNote.style.display = 'none'; }
   }
 
-  // Leak Test: not tracked in the data source yet -> placeholder
-  const leak = pt.leak || { done: 0, tracked: false };
+  // Leak Test: số leak test đã Done (Testing done) / tổng gói leak test + % (từ leakTestLogic).
+  // Nếu leakTestLogic chưa có dữ liệu (chưa mở tab & chưa nạp LEAK_TEST_DATA tĩnh) -> placeholder.
   const leakNote = document.getElementById('z1-leak-note');
-  if (leak.tracked === false) {
+  const leakSum = (window.LeakTestSummary && window.LeakTestSummary());
+  if (leakSum) {
+    const lp = document.getElementById('z1-leak-pct'); if (lp) lp.style.display = '';
+    const lbar = document.getElementById('z1-leak-bar'); if (lbar && lbar.parentElement) lbar.parentElement.style.display = '';
+    setText('z1-leak-val', `${fmt(leakSum.done)} / ${fmt(leakSum.total)}`);
+    setPct('z1-leak-pct', leakSum.pct, 'stat-pct'); setBar('z1-leak-bar', leakSum.pct);
+    if (leakNote) leakNote.style.display = 'none';
+  } else {
     setText('z1-leak-val', '—');
     const lp = document.getElementById('z1-leak-pct'); if (lp) lp.style.display = 'none';
     const lbar = document.getElementById('z1-leak-bar'); if (lbar && lbar.parentElement) lbar.parentElement.style.display = 'none';
     if (leakNote) leakNote.style.display = 'block';
-  } else {
-    const leakPct = getProgressPct(leak.done, pt.tpTotal);
-    setText('z1-leak-val', `${fmt(leak.done)} / ${fmt(pt.tpTotal)}`);
-    setPct('z1-leak-pct', leakPct, 'stat-pct'); setBar('z1-leak-bar', leakPct);
-    if (leakNote) leakNote.style.display = 'none';
   }
 
   // ----- Zone 2: Fabrication Information -----
