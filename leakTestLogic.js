@@ -290,6 +290,26 @@
   }
   window.updateLeakDashCard = updateLeakDashCard;
 
+  // Bảo đảm ô Dashboard "Leak Test Packages" có số liệu NGAY cả khi CHƯA mở tab Leak Test.
+  // Chỉ cần total (số gói) + done (testing) -> nhẹ: dùng LEAK_TEST_DATA tĩnh nếu có; nếu chưa,
+  // tự sinh demo từ danh sách Hydrotest (hydroMap) — KHÔNG cần build flange/punch/PrecomDB.
+  var _ensuredLeak = false;
+  function ensureLeakSummaryData() {
+    if (window.LEAK_TEST_DATA && window.LEAK_TEST_DATA.length) { updateLeakDashCard(); return; }
+    if (state.leakRows && state.leakRows.length) { updateLeakDashCard(); return; }
+    if (_ensuredLeak) return; _ensuredLeak = true;
+    (window.LocalDB && window.LocalDB.ready ? window.LocalDB.ready() : Promise.resolve())
+      .then(function () { return _loadHydroMap(); })
+      .then(function (hm) {
+        state.hydroMap = state.hydroMap || hm;
+        if ((!window.LEAK_TEST_DATA || !window.LEAK_TEST_DATA.length) && state.hydroMap && state.hydroMap.size) {
+          window.LEAK_TEST_DATA = _demoFromHydro();
+        }
+        updateLeakDashCard();   // _leakSummary đọc LEAK_TEST_DATA (total + testingDone)
+      }).catch(function () { _ensuredLeak = false; });
+  }
+  window.ensureLeakSummaryData = ensureLeakSummaryData;
+
   // Sidebar: BẢNG theo Subsystem — cột System / System No / Subsystem No / Test pack (Done/Total + %).
   // Test pack Done = số leak test đã test xong (Testing done) trong subsystem đó. Gom O(n) bằng Map.
   function renderSidebar() {
@@ -784,4 +804,8 @@
     computeLeakRows: computeLeakRows,
     _evalOf: _evalOf, state: state
   };
+
+  // Nạp số liệu cho ô Dashboard "Leak Test Packages" sớm (deferred, không chặn khởi động).
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { setTimeout(ensureLeakSummaryData, 1500); });
+  else setTimeout(ensureLeakSummaryData, 1500);
 })();

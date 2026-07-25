@@ -2675,6 +2675,8 @@ function renderDashboardZones() {
     const lp = document.getElementById('z1-leak-pct'); if (lp) lp.style.display = 'none';
     const lbar = document.getElementById('z1-leak-bar'); if (lbar && lbar.parentElement) lbar.parentElement.style.display = 'none';
     if (leakNote) leakNote.style.display = 'block';
+    // Kích hoạt nạp số liệu Leak Test (nhẹ) rồi cập nhật lại ô này khi sẵn sàng.
+    if (window.ensureLeakSummaryData) window.ensureLeakSummaryData();
   }
 
   // ----- Zone 2: Fabrication Information -----
