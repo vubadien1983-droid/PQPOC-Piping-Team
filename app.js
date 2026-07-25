@@ -2494,6 +2494,7 @@ function initTabs() {
   const tabs = [
     { btn: 'tab-analytics-view', container: 'analytics-view-container', name: 'analytics-view' },
     { btn: 'tab-fab-view', container: 'fab-view-container', name: 'fab-view' },
+    { btn: 'tab-leaktest-view', container: 'leaktest-view-container', name: 'leaktest-view' },
     { btn: 'tab-database-view', container: 'database-view-container', name: 'database-view' },
     { btn: 'tab-testingdata-view', container: 'testingdata-view-container', name: 'testingdata-view' },
     { btn: 'tab-precom-view', container: 'precom-view-container', name: 'precom-view' },
@@ -2528,6 +2529,10 @@ function initTabs() {
         // System Detailed load on demand via /api/joints. (Removed a legacy
         // Firebase fetch that parsed a big blob and rendered nothing.)
         initResizablePanels();
+      }
+      if (tab.name === 'leaktest-view' && window.LeakTestInit) {
+        // Leak Test tab: dựng lookup Maps + render lần đầu (lazy).
+        window.LeakTestInit();
       }
       if (tab.name === 'precom-view' && window.PrecomInit) {
         // Precom (ITR-A/Punch): DB thu 2 tai LAZY o lan mo dau tien (precom.js).

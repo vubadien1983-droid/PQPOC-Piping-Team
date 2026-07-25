@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="style.css?v=1784856474">
+  <link rel="stylesheet" href="style.css?v=1784961446">
   <!-- defer = tải song song, KHÔNG chặn parse HTML. Các lib này chỉ dùng khi export / tab lazy
        (ExcelJS, XLSX, html2pdf, LZString, ApexCharts) -> defer an toàn, chạy xong trước khi user bấm. -->
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
@@ -24,6 +24,56 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+  <!-- Leak Test tab styles -->
+  <style>
+    .lt-select{background:rgba(0,0,0,.2);border:1px solid rgba(255,255,255,.1);border-radius:6px;color:#e2e8f0;padding:.3rem .5rem;font-size:.72rem;outline:none;}
+    .lt-chart-wrap{position:relative;flex:1;min-height:180px;width:100%;padding:.5rem;display:flex;align-items:center;justify-content:center;}
+    .lt-empty{color:var(--text-muted,#94a3b8);font-size:.8rem;text-align:center;font-style:italic;}
+    .lt-sub-group{display:flex;justify-content:space-between;align-items:center;padding:.5rem .7rem;margin:.2rem 0;border-radius:6px;cursor:pointer;border:1px solid transparent;transition:background .15s;}
+    .lt-sub-group:hover{background:rgba(255,255,255,.04);}
+    .lt-sub-group.lt-sub-active{background:rgba(16,185,129,.12);border-color:rgba(16,185,129,.4);}
+    .lt-sub-name{font-weight:600;font-size:.78rem;color:#e2e8f0;}
+    .lt-sub-count{font-size:.7rem;color:var(--text-muted,#94a3b8);font-variant-numeric:tabular-nums;}
+    .lt-table td{vertical-align:middle;}
+    .lt-row{cursor:pointer;}
+    .lt-row:hover{background:rgba(255,255,255,.04);}
+    .lt-sub-tag{font-size:.66rem;color:var(--text-muted,#94a3b8);margin-top:.1rem;}
+    .lt-pct{font-weight:700;}
+    .lt-frac{font-weight:700;color:#e2e8f0;font-variant-numeric:tabular-nums;}
+    .lt-pct.p-done{color:#10b981;} .lt-pct.p-mid{color:#f59e0b;} .lt-pct.p-low{color:#94a3b8;}
+    .lt-ready-badge{display:inline-block;padding:.15rem .5rem;border-radius:999px;background:rgba(16,185,129,.15);color:#10b981;font-weight:700;font-size:.7rem;border:1px solid rgba(16,185,129,.4);}
+    .lt-modal-table{width:100%;border-collapse:collapse;font-size:.75rem;table-layout:auto;}
+    .lt-modal-table th,.lt-modal-table td{padding:.4rem .55rem;border-bottom:1px solid rgba(255,255,255,.06);white-space:nowrap;vertical-align:middle;}
+    .lt-modal-table td.wrap,.lt-modal-table th.wrap{white-space:normal;width:auto;min-width:220px;}
+    .lt-modal-table th{color:var(--text-muted,#94a3b8);text-transform:uppercase;font-size:.66rem;text-align:center;}
+    .lt-chip{display:inline-block;width:20px;height:20px;line-height:20px;border-radius:50%;font-weight:700;font-size:.75rem;}
+    .lt-chip.ok{background:rgba(16,185,129,.18);color:#10b981;}
+    .lt-chip.no{background:rgba(100,116,139,.18);color:#94a3b8;}
+    .lt-hpkg-row{cursor:pointer;transition:background .12s;}
+    .lt-hpkg-row:hover{background:rgba(14,165,233,.12);}
+    .lt-sec-h{font-family:var(--font-display,inherit);font-size:.8rem;color:#fff;text-transform:uppercase;margin:1rem 0 .5rem;letter-spacing:.02em;}
+    /* Sidebar table */
+    .lt-sidebar-table{width:100%;border-collapse:collapse;font-size:.72rem;}
+    .lt-sidebar-table th{position:sticky;top:0;background:#0f1830;color:var(--text-muted,#94a3b8);text-transform:uppercase;font-size:.6rem;padding:.4rem .3rem;text-align:left;z-index:1;}
+    .lt-sidebar-table td{padding:.15rem .3rem;border-bottom:1px solid rgba(255,255,255,.04);}
+    .lt-sub-row{cursor:pointer;transition:background .12s;}
+    .lt-sub-row:hover{background:rgba(255,255,255,.05);}
+    .lt-sub-row.selected-row{background:rgba(16,185,129,.14);}
+    /* Overview split: chart trái, detail phải */
+    .lt-overview-split{display:flex;flex:1;min-height:0;gap:.8rem;width:100%;}
+    .lt-overview-split .lt-chart-wrap{flex:1 1 50%;min-height:180px;}
+    .lt-detail-panel{flex:1 1 46%;overflow:hidden;padding:.2rem .55rem;border-left:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;gap:.28rem;justify-content:center;}
+    .lt-detail-head{font-size:.72rem;font-weight:700;color:#e2e8f0;display:flex;align-items:center;gap:.35rem;}
+    .lt-detail-clear{background:transparent;border:none;color:#f43f5e;font-size:1rem;line-height:1;cursor:pointer;padding:0 3px;}
+    .lt-detail-sub{font-size:.58rem;color:var(--text-muted,#94a3b8);text-transform:uppercase;margin-top:.15rem;border-top:1px solid rgba(255,255,255,.06);padding-top:.25rem;}
+    .lt-stat{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:1px 6px;}
+    .lt-stat-label{font-size:.66rem;color:#cbd5e1;}
+    .lt-stat-val{font-family:monospace;font-size:.68rem;}
+    .lt-stat-val b{color:#fff;}
+    .lt-stat-bar{flex-basis:100%;height:4px;border-radius:2px;background:rgba(255,255,255,.06);overflow:hidden;}
+    .lt-stat-fill{display:block;height:100%;border-radius:2px;}
+    .lt-stat-fill.pct-low{background:#f43f5e;} .lt-stat-fill.pct-mid{background:#f59e0b;} .lt-stat-fill.pct-high{background:#10b981;}
+  </style>
   <script>if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{updateViaCache:"none"}).catch(function(){});});}</script>
 </head>
 <body>
@@ -62,6 +112,13 @@
             <rect x="3" y="16" width="7" height="5" rx="1"></rect>
           </svg>
           Testing Status
+        </button>
+        <button class="tab-btn" id="tab-leaktest-view">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="tab-icon">
+            <path d="M7 2h10M9 2v6l-5 9a3 3 0 0 0 3 4h10a3 3 0 0 0 3-4l-5-9V2"></path>
+            <path d="M6.5 15h11"></path>
+          </svg>
+          Leak Test
         </button>
         <button class="tab-btn" id="tab-database-view" style="display:none;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="tab-icon">
@@ -267,6 +324,93 @@
                 <h3>No Detailed Data</h3>
                 <p>Select a system on the Left Panel to load detailed Test Package logs.</p>
               </div>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <!-- LEAK TEST VIEW -->
+    <div id="leaktest-view-container" class="tab-content" style="display:none; flex-direction:column; height:calc(100% - 55px); overflow:hidden; width:100%;">
+      <div class="dashboard-grid">
+        <aside class="left-panel card">
+          <div class="panel-header">
+            <h2>Leak Test Packages</h2>
+            <p class="panel-subtitle">Nhóm theo Subsystem · click để lọc</p>
+          </div>
+          <div class="panel-search">
+            <input type="text" id="lt-search" placeholder="Tìm Leak Test / Hydrotest No...">
+          </div>
+          <div class="table-container left-table-scroll" id="lt-sidebar-body" style="padding:0.4rem;">
+            <div class="lt-empty">Đang tải…</div>
+          </div>
+          <div class="panel-footer">
+            <p>Block B CPP &copy; 2026 · Leak Test Readiness (A: Sheet · B: Punch A · C: Flange)</p>
+          </div>
+        </aside>
+
+        <div class="splitter vertical" id="lt-splitter"></div>
+
+        <main class="right-panel">
+          <section class="overview-panel card">
+            <div class="overview-header" style="display:flex; justify-content:space-between; align-items:flex-start; width:100%;">
+              <div>
+                <h2 style="font-size:0.8rem; margin-bottom:0.15rem;">Leak Test Overview</h2>
+                <p class="panel-subtitle">Tổng quan tình trạng Ready for test</p>
+              </div>
+              <div style="display:flex; gap:0.5rem; align-items:center;">
+                <select id="lt-readiness-filter" class="lt-select" title="Lọc theo readiness">
+                  <option value="all">Tất cả</option>
+                  <option value="ready">Chỉ Ready</option>
+                  <option value="pending">Chỉ Pending</option>
+                </select>
+                <button class="btn btn-secondary" id="lt-clear-btn" title="Xoá bộ lọc">Xoá lọc</button>
+              </div>
+            </div>
+            <div class="lt-overview-split">
+              <div class="lt-chart-wrap">
+                <canvas id="lt-pie-chart"></canvas>
+              </div>
+              <div class="lt-detail-panel" id="lt-detail-panel"></div>
+            </div>
+          </section>
+
+          <div class="splitter horizontal" id="lt-right-splitter"></div>
+
+          <section class="detailed-panel card">
+            <div class="detailed-header">
+              <div>
+                <h2>Leak Test — Chi tiết</h2>
+                <p class="panel-subtitle">Sum Hydrotest (Ready/Total) · Flange · Readiness</p>
+              </div>
+              <div class="detailed-actions" style="display:flex;">
+                <button class="btn btn-secondary" id="lt-export-btn">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line>
+                  </svg>
+                  Export Excel
+                </button>
+              </div>
+            </div>
+            <div class="table-container detailed-table-scroll">
+              <table class="detailed-table lt-table">
+                <thead>
+                  <tr>
+                    <th style="width:1%; text-align:center;">No</th>
+                    <th>Leak Test No</th>
+                    <th style="text-align:center;" title="Số Hydrotest Ready / Tổng">Sum Hydrotest</th>
+                    <th style="text-align:center;" title="Punch A đã Closed / tổng Punch A">Punch A</th>
+                    <th style="text-align:center;" title="Flange joint Done / Tổng">Flange management</th>
+                    <th style="text-align:center;">Readiness</th>
+                    <th style="text-align:center;">Testing</th>
+                  </tr>
+                </thead>
+                <tbody id="lt-table-body">
+                  <tr><td colspan="7" class="lt-empty" style="padding:2rem;">Đang tải…</td></tr>
+                </tbody>
+              </table>
             </div>
           </section>
         </main>
@@ -593,6 +737,46 @@
     </div>
   </div>
 
+  <!-- Leak Test Details Modal -->
+  <div id="leaktest-detail-modal" class="modal-backdrop" style="display:none;">
+    <div class="modal-content card">
+      <div class="modal-header">
+        <h2 id="lt-modal-title">Leak Test Details</h2>
+        <div style="display:flex; align-items:center; gap:0.5rem;">
+          <button class="btn btn-secondary" id="lt-modal-export" style="padding:0.35rem 0.65rem; font-size:0.7rem;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon" style="width:12px; height:12px;">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line>
+            </svg>
+            Export Excel
+          </button>
+          <button class="modal-close-btn" id="lt-modal-close">&times;</button>
+        </div>
+      </div>
+      <div class="modal-body" id="lt-modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Leak Test — Hydrotest package drill-down (cấp 2) -->
+  <div id="leaktest-pkg-modal" class="modal-backdrop" style="display:none; z-index:1200;">
+    <div class="modal-content card">
+      <div class="modal-header">
+        <h2 id="lt-pkg-modal-title">Hydrotest Details</h2>
+        <div style="display:flex; align-items:center; gap:0.5rem;">
+          <button class="btn btn-secondary" id="lt-pkg-modal-export" style="padding:0.35rem 0.65rem; font-size:0.7rem;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon" style="width:12px; height:12px;">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line>
+            </svg>
+            Export Excel
+          </button>
+          <button class="modal-close-btn" id="lt-pkg-modal-close">&times;</button>
+        </div>
+      </div>
+      <div class="modal-body" id="lt-pkg-modal-body"></div>
+    </div>
+  </div>
+
   <!-- Global Excel-like Filter Popup -->
   <div id="excel-filter-popup" class="excel-filter-popup" style="display: none;">
     <div style="display: flex; gap: 8px; align-items: center; width: 100%;">
@@ -605,9 +789,9 @@
   </div>
 
   <!-- Scripts -->
-  <script src="fabrication-status.js?v=1784856474"></script>
+  <script src="fabrication-status.js?v=1784961446"></script>
   <!-- Idle manager: singleton tab lock + auto-logout after 60 min inactivity -->
-  <script src="idle-manager.js?v=1784856474"></script>
+  <script src="idle-manager.js?v=1784961446"></script>
   <!-- PLAN A (Full Local-first): tải piping_data.db.gz từ GitHub về máy, chạy SQLite-WASM.
        Khi chạy localhost, view=live/testpacks gọi server local (server.js) thay vì Vercel.
        Bản hybrid cũ (precompute.js) đã đưa vào _quarantine. -->
@@ -620,13 +804,15 @@
       window.AI_API_URL = 'https://block-b-piping-fab.vercel.app/api/ai-query';
     }
   </script>
-  <script src="db-sqlite.js?v=1784856474"></script>
-  <script src="local-first.js?v=1784856474"></script>
-  <script src="app.js?v=1784856474"></script>
+  <script src="db-sqlite.js?v=1784961446"></script>
+  <script src="local-first.js?v=1784961446"></script>
+  <script src="app.js?v=1784961446"></script>
+  <!-- Leak Test tab: logic + lookup Maps (dùng chung LocalDB/PrecomDB) -->
+  <script src="leakTestLogic.js?v=1784961446"></script>
   <!-- Precom (ITR-A/Punch): DB thu 2, LAZY - chi tai khi mo tab Precom -->
-  <script src="precom-db.js?v=1784856474"></script>
-  <script src="precom.js?v=1784856474"></script>
+  <script src="precom-db.js?v=1784961446"></script>
+  <script src="precom.js?v=1784961446"></script>
   <!-- AI Assistant: ask-your-data (text-to-SQL over the local SQLite) -->
-  <script src="ai-assistant.js?v=1784856474"></script>
+  <script src="ai-assistant.js?v=1784961446"></script>
 </body>
 </html>
