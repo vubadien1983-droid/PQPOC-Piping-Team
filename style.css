@@ -2814,6 +2814,15 @@ input[type="number"]:focus {
 .material-progress-table .material-pct.high { color: #10b981; }
 .material-progress-table .material-pct.mid { color: #f59e0b; }
 .material-progress-table .material-pct.low { color: #ef4444; }
+/* Dong Total cuoi bang Flange: noi bat, gach tren, khong doi mau khi hover */
+.material-progress-table .material-total-row td {
+  border-top: 2px solid rgba(255, 255, 255, 0.18);
+  border-bottom: none;
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.03);
+}
+.material-progress-table .material-total-row .material-name { color: #ffffff; }
+.material-progress-table .material-total-row:hover { background: transparent; }
 /* Clickable metric cells (JointNo / Dia-Inch) -> plot the material's s-curve */
 .material-progress-table .mat-metric {
   text-align: center; cursor: pointer; transition: background 0.15s, box-shadow 0.15s;

@@ -2725,9 +2725,11 @@ function renderFlangeByMaterial() {
   const cls = (p) => p >= 80 ? 'high' : p >= 50 ? 'mid' : 'low';
   tbody.innerHTML = '';
 
+  let sumTotal = 0, sumDone = 0;
   list.forEach((m) => {
     const mat = m.material || 'Unknown';
     const total = m.total || 0, done = m.done || 0, pct = getProgressPct(done, total);
+    sumTotal += total; sumDone += done;
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="material-name">${escapeHtml(mat)}</td>
@@ -2737,6 +2739,18 @@ function renderFlangeByMaterial() {
     `;
     tbody.appendChild(tr);
   });
+
+  // Dong TOTAL: cong don Total FM + Done cua moi material; % = tong done / tong total.
+  const totPct = getProgressPct(sumDone, sumTotal);
+  const trTot = document.createElement('tr');
+  trTot.className = 'material-total-row';
+  trTot.innerHTML = `
+    <td class="material-name">Total</td>
+    <td style="text-align:center;">${fmt(sumTotal)}</td>
+    <td style="text-align:center;">${fmt(sumDone)}</td>
+    <td style="text-align:center;"><span class="material-pct ${cls(totPct)}">${totPct}%</span></td>
+  `;
+  tbody.appendChild(trTot);
 }
 
 // Preferred display order for the Material Progress table; others appended after.
