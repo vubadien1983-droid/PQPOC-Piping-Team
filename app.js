@@ -2699,6 +2699,44 @@ function renderDashboardZones() {
   setPct('z2-dia-pct', diaPct, 'metric-pct'); setBar('z2-dia-bar', diaPct);
 
   renderMaterialProgress();
+  renderFlangeByMaterial();
+}
+
+// Render Flange Management summary (Zone 5): per material -> Total FM / Done / %.
+// Nguồn: DASH.totals.flangeByMaterial (flange_joints join piping_data.material). Ẩn cả zone
+// khi chưa có dữ liệu flange (build static-JSON hoặc DB chưa upload flange).
+function renderFlangeByMaterial() {
+  const tbody = document.getElementById('flange-material-body');
+  if (!tbody) return;
+  const wrapper = document.getElementById('zone-flange');
+  const list = ((DASH.totals && DASH.totals.flangeByMaterial) || [])
+    .filter(m => (m.total || 0) > 0).slice();
+  if (!list.length) { if (wrapper) wrapper.style.display = 'none'; return; }
+  if (wrapper) wrapper.style.display = '';
+
+  // Cùng thứ tự ưu tiên với bảng Welding/Bonding; vật liệu lạ / rỗng xuống cuối.
+  list.sort((a, b) => {
+    const ia = MATERIAL_ORDER.indexOf(a.material), ib = MATERIAL_ORDER.indexOf(b.material);
+    const ra = ia === -1 ? 999 : ia, rb = ib === -1 ? 999 : ib;
+    return ra - rb || String(a.material || '').localeCompare(String(b.material || ''));
+  });
+
+  const fmt = (n) => (Math.round(n) || 0).toLocaleString();
+  const cls = (p) => p >= 80 ? 'high' : p >= 50 ? 'mid' : 'low';
+  tbody.innerHTML = '';
+
+  list.forEach((m) => {
+    const mat = m.material || 'Unknown';
+    const total = m.total || 0, done = m.done || 0, pct = getProgressPct(done, total);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="material-name">${escapeHtml(mat)}</td>
+      <td style="text-align:center;">${fmt(total)}</td>
+      <td style="text-align:center;">${fmt(done)}</td>
+      <td style="text-align:center;"><span class="material-pct ${cls(pct)}">${pct}%</span></td>
+    `;
+    tbody.appendChild(tr);
+  });
 }
 
 // Preferred display order for the Material Progress table; others appended after.

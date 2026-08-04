@@ -85,7 +85,7 @@
       } catch (e) {}
       // Material Progress: per material, completion by JointNo AND by Dia-Inch.
       // done = Visual ACC (metallic = weld visual; non-metallic GRE/CPVC/PPR = bonding visual).
-      var materialProgress = [], materialByDay = [];
+      var materialProgress = [], materialByDay = [], flangeByMaterial = [];
       try {
         materialProgress = LocalDB.query(
           "SELECT UPPER(TRIM(material)) AS material," +
@@ -107,7 +107,32 @@
           " WHERE day IS NOT NULL GROUP BY material, day"
         );
       } catch (e) {}
-      _static = { packages: packages, daily: daily, meta: meta, diaTotal: diaTotal, weldedDia: weldedDia, diaByDay: diaByDay, materialProgress: materialProgress, materialByDay: materialByDay };
+      // Flange Management theo từng loại vật liệu: mỗi flange joint (flange_joints) map sang
+      // material của pipe qua spool_no -> piping_data.material (cùng "vũ trụ" vật liệu với bảng
+      // Welding/Bonding). done = đã siết (tightened_date có -> cột done=1). Chuẩn hoá spool key
+      // (upper, bỏ mọi khoảng trắng + dấu nháy) để khớp tối đa như bước build. Bảng chỉ có sau
+      // khi upload flange -> bọc try/catch, DB cũ không có flange_joints thì trả [].
+      try {
+        var _hasFl = LocalDB.query("SELECT name FROM sqlite_master WHERE type='table' AND name='flange_joints'").length > 0;
+        if (_hasFl) {
+          // Chuẩn hoá SpoolNo giống _norm_spool của build_sqlite.py: upper, bỏ mọi khoảng trắng
+          // (space/tab) và mọi ký tự nháy (thẳng + cong/smart) — vì piping_data & flange_joints
+          // đến từ 2 file Excel khác nhau, cách mã hoá dấu nháy có thể lệch.
+          var _q = ["' '", "CHAR(9)", "'\"'", "''''",
+                    "CHAR(8220)", "CHAR(8221)", "CHAR(8243)", "CHAR(698)",
+                    "CHAR(8216)", "CHAR(8217)", "CHAR(8242)", "CHAR(697)"];
+          var norm = function (c) { return _q.reduce(function (e, ch) { return "REPLACE(" + e + "," + ch + ",'')"; }, "UPPER(TRIM(" + c + "))"); };
+          flangeByMaterial = LocalDB.query(
+            "SELECT UPPER(TRIM(pm.material)) AS material, COUNT(*) AS total, SUM(f.done) AS done" +
+            " FROM flange_joints f LEFT JOIN (" +
+            "   SELECT " + norm("spool_no") + " AS sk, MAX(material) AS material" +
+            "   FROM piping_data WHERE TRIM(COALESCE(spool_no,''))<>'' GROUP BY sk" +
+            " ) pm ON " + norm("f.spool_no") + " = pm.sk" +
+            " GROUP BY UPPER(TRIM(pm.material))"
+          );
+        }
+      } catch (e) {}
+      _static = { packages: packages, daily: daily, meta: meta, diaTotal: diaTotal, weldedDia: weldedDia, diaByDay: diaByDay, materialProgress: materialProgress, materialByDay: materialByDay, flangeByMaterial: flangeByMaterial };
       return _static;
     }).then(function (s) { _staticP = null; return s; }, function (e) { _staticP = null; throw e; });
     return _staticP;
@@ -133,7 +158,7 @@
           var list = (liveList && liveList.length) ? liveList : fallback;
           var map = new Map();
           list.forEach(function (p) { map.set(String(p.testPackageNo).toUpperCase(), { hydro: p.hydro || '', reinst: p.reinst || '', note: p.note || '' }); });
-          _data = { packages: s.packages, daily: s.daily, live: { ok: list.length > 0, list: list, map: map }, meta: s.meta, diaTotal: s.diaTotal, weldedDia: s.weldedDia, diaByDay: s.diaByDay, materialProgress: s.materialProgress, materialByDay: s.materialByDay };
+          _data = { packages: s.packages, daily: s.daily, live: { ok: list.length > 0, list: list, map: map }, meta: s.meta, diaTotal: s.diaTotal, weldedDia: s.weldedDia, diaByDay: s.diaByDay, materialProgress: s.materialProgress, materialByDay: s.materialByDay, flangeByMaterial: s.flangeByMaterial };
           return _data;
         });
     }).then(function (d) { _dataP = null; return d; }, function (e) { _dataP = null; throw e; });
@@ -203,7 +228,7 @@
     var tpTotal = fab.size, hd, rd, nif, st;
     if (live.ok) { hd = 0; rd = 0; nif = 0; live.list.forEach(function (p) { var up = String(p.testPackageNo).toUpperCase(); if (p.hydro) hd++; if (p.reinst && fab.has(up)) rd++; if (!fab.has(up)) nif++; }); st = live.list.length; }
     else { hd = sh; rd = sr; nif = 0; st = 0; }
-    return { projectTotals: { systemCount: Object.keys(systems).length, joints: s.joints, weldDone: s.weldDone, rt: s.rt, paut: s.paut, ut: { req: 0, done: 0 }, mt: s.mt, pt: s.pt, pmi: s.pmi, pwht: s.pwht, hardness: s.hardness, tpTotal: tpTotal, hydro: { req: tpTotal, done: hd, notInFab: nif, sheetTotal: st, live: live.ok }, reinst: { req: tpTotal, done: rd }, diaInch: { done: d.weldedDia || 0, total: d.diaTotal || 0 }, materialProgress: d.materialProgress || [], leak: { req: tpTotal, done: 0, tracked: false } } };
+    return { projectTotals: { systemCount: Object.keys(systems).length, joints: s.joints, weldDone: s.weldDone, rt: s.rt, paut: s.paut, ut: { req: 0, done: 0 }, mt: s.mt, pt: s.pt, pmi: s.pmi, pwht: s.pwht, hardness: s.hardness, tpTotal: tpTotal, hydro: { req: tpTotal, done: hd, notInFab: nif, sheetTotal: st, live: live.ok }, reinst: { req: tpTotal, done: rd }, diaInch: { done: d.weldedDia || 0, total: d.diaTotal || 0 }, materialProgress: d.materialProgress || [], flangeByMaterial: d.flangeByMaterial || [], leak: { req: tpTotal, done: 0, tracked: false } } };
   }
 
   function parseDate(str) {

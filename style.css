@@ -2389,11 +2389,29 @@ input[type="number"]:focus {
   align-items: stretch;
   flex-wrap: wrap;
 }
-.dash-top-row > .dash-zone { margin: 0; min-width: 280px; }
-.dash-top-row > #zone-general  { flex: 1 1 240px; }
-.dash-top-row > #zone-fab      { flex: 1.5 1 330px; }
-.dash-top-row > #zone-material { flex: 1.6 1 380px; }
+/* 5 bảng trên 1 hàng: thu nhỏ General + Fabrication để nhường chỗ cho bảng Flange mới. */
+.dash-top-row > .dash-zone { margin: 0; min-width: 200px; }
+.dash-top-row > #zone-general  { flex: 0.8 1 190px; }
+.dash-top-row > #zone-fab      { flex: 1 1 230px; }
+.dash-top-row > #zone-material { flex: 1.4 1 340px; }
+.dash-top-row > #zone-flange   { flex: 1 1 240px; }
 .dash-zone-tag.tag-teal { background: rgba(20, 184, 166, 0.18); color: #2dd4bf; border: 1px solid rgba(20,184,166,0.4); }
+.dash-zone-tag.tag-amber { background: rgba(245, 158, 11, 0.18); color: #fbbf24; border: 1px solid rgba(245,158,11,0.4); }
+
+/* Thu nhỏ dữ liệu Zone 1 (General) + Zone 2 (Fabrication) để 5 bảng cùng vừa 1 hàng. */
+#zone-general .stat-card { padding: 0.4rem 0.55rem; gap: 0.2rem; }
+#zone-general .stat-card-label { font-size: 0.62rem; }
+#zone-general .stat-big  { font-size: 1.2rem; }
+#zone-general .stat-frac { font-size: 0.9rem; }
+#zone-general .stat-pct  { font-size: 0.75rem; }
+#zone-general .stat-card-sub, #zone-general .stat-warn-note { font-size: 0.6rem; margin-top: 0.25rem; }
+#zone-general .stat-bar { height: 5px; }
+#zone-fab .zone2-grid { gap: 0.3rem; }
+#zone-fab .metric-card { padding: 0.35rem 0.55rem; }
+#zone-fab .metric-card-label { font-size: 0.68rem; }
+#zone-fab .metric-frac { font-size: 0.85rem; }
+#zone-fab .metric-pct { font-size: 0.75rem; }
+#zone-fab .metric-card .stat-bar { height: 4px; }
 
 /* ---- Zone 1 stat cards ---- */
 .stat-card {

@@ -149,9 +149,20 @@
     '.pcm-dd-opt:hover{background:#e8f0fe;}' +
     '.pcm-dd-opt.sel{background:#eef4ff;font-weight:800;}' +
     '.pcm-dd-ct{font-size:.68rem;color:#5b6b80;}' +
+    // ---- Drill subsystem: o Subsystem trong bang modal click-duoc -> cua so cap 2 ----
+    '.pcm-ss-link{cursor:pointer;color:#0369a1!important;font-weight:700;text-decoration:underline dotted;}' +
+    '.pcm-ss-link:hover{background:#e8f0fe;}' +
+    '.pcm-ss-link b{color:#0369a1!important;}' +
+    '#pcm-modal2{z-index:100010;}' +   // cua so cap 2 nam TREN modal cap 1 (99999)
     '</style>';
 
   function ssShort(ss) { return String(ss || '').replace(/^CPPT-/i, ''); }
+  // O Subsystem click-duoc trong bang modal -> mo cua so cap 2 (data-ssdrill giu ma day du).
+  function ssCell(ss, bold) {
+    var inner = bold ? '<b>' + esc(ssShort(ss)) + '</b>' : esc(ssShort(ss));
+    return '<td class="pcm-ss-link" data-ssdrill="' + esc(ss) +
+      '" title="' + esc(ss) + ' — Click: mở cửa sổ chi tiết subsystem">' + inner + '</td>';
+  }
   function discSort(a, b) {
     var ia = DISC_ORDER.indexOf(a.toUpperCase()), ib = DISC_ORDER.indexOf(b.toUpperCase());
     if (ia < 0) ia = 99; if (ib < 0) ib = 99;
@@ -324,7 +335,7 @@
       c.onclick = function (e) { e.stopPropagation(); openDisciplineModal(c.getAttribute('data-dacdisc')); };
     });
     el('precom-kpis').querySelectorAll('[data-csscss]').forEach(function (c) {
-      c.onclick = function (e) { e.stopPropagation(); openScopeModal({ type: 'ss', ss: c.getAttribute('data-csscss') }); };
+      c.onclick = function (e) { e.stopPropagation(); openSubsystemWindow(c.getAttribute('data-csscss')); };
     });
     wireChipTips();   // tooltip tuy bien (hien ngay) cho chip CSSC co data-tip
 
@@ -918,11 +929,99 @@
     el('pcm-close').onclick = closeModal;
     m.addEventListener('click', function (e) { if (e.target === m) closeModal(); });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && el('pcm-modal') && el('pcm-modal').classList.contains('show')) closeModal(); });
+    // Delegated: click o Subsystem (data-ssdrill) trong bat ky bang modal cap 1 -> cua so cap 2.
+    el('pcm-body').addEventListener('click', function (e) {
+      var td = e.target.closest('[data-ssdrill]'); if (!td) return;
+      e.stopPropagation(); openSubsystemWindow(td.getAttribute('data-ssdrill'));
+    });
   }
   function showModal() { ensureModal(); el('pcm-modal').classList.add('show'); }
   function closeModal() {
     var m = el('pcm-modal'); if (m) m.classList.remove('show');
     if (_mchart) { try { _mchart.destroy(); } catch (e) {} _mchart = null; }
+  }
+
+  // ==================== CUA SO CAP 2: chi tiet 1 SUBSYSTEM (nested modal) ====================
+  var _mchart2 = null;   // chart cua cua so cap 2 (rieng, khong dung chung _mchart)
+  function ensureModal2() {
+    if (el('pcm-modal2')) return;
+    var m = document.createElement('div');
+    m.id = 'pcm-modal2'; m.className = 'pcm-modal';
+    m.innerHTML =
+      '<div class="pcm-win">' +
+        '<div class="pcm-head">' +
+          '<h2 id="pcm-title2">Subsystem</h2>' +
+          '<span class="pcm-sub" id="pcm-sub2"></span>' +
+          '<button class="pcm-btn" id="pcm-export2">⬇ Export Excel</button>' +
+          '<button class="pcm-btn x" id="pcm-close2" title="Đóng (Esc)">✕</button>' +
+        '</div>' +
+        '<div class="pcm-body" id="pcm-body2"></div>' +
+      '</div>';
+    document.body.appendChild(m);
+    el('pcm-close2').onclick = closeModal2;
+    m.addEventListener('click', function (e) { if (e.target === m) closeModal2(); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && el('pcm-modal2') && el('pcm-modal2').classList.contains('show')) closeModal2();
+    });
+  }
+  function showModal2() { ensureModal2(); el('pcm-modal2').classList.add('show'); }
+  function closeModal2() {
+    var m = el('pcm-modal2'); if (m) m.classList.remove('show');
+    if (_mchart2) { try { _mchart2.destroy(); } catch (e) {} _mchart2 = null; }
+  }
+  // Mo cua so cap 2 cho 1 subsystem (modal cap 1 van giu phia sau). ss = ma day du (co CPPT-).
+  function openSubsystemWindow(ss) {
+    var sc = scopeWhereFor({ type: 'ss', ss: ss }, '__ALL__');   // pham vi = rieng subsystem nay
+    var d = detailQueries(sc);
+    var srows = window.PrecomDB.query(
+      'SELECT discipline, system_no, subsystem_desc, itr_total, itr_done,' +
+      ' COALESCE(punch_a_total,0) pat, COALESCE(punch_a_open,0) pao,' +
+      ' COALESCE(punch_b_total,0) pbt, COALESCE(punch_b_open,0) pbo' +
+      ' FROM precom_summary WHERE UPPER(TRIM(subsystem))=? ORDER BY discipline', [ss]);
+    var itDone = 0, itTot = 0, paC = 0, paT = 0, pbC = 0, pbT = 0, dacN = 0, discN = 0, sysNo = '', desc = '';
+    srows.forEach(function (r) {
+      itDone += r.itr_done; itTot += r.itr_total;
+      paC += (r.pat - r.pao); paT += r.pat; pbC += (r.pbt - r.pbo); pbT += r.pbt;
+      sysNo = r.system_no || sysNo; desc = r.subsystem_desc || desc;
+      if (r.itr_total || r.pat || r.pbt) { discN++; if (r.itr_done >= r.itr_total && r.pao === 0) dacN++; }
+    });
+    var cssc = (discN > 0 && dacN >= discN);
+    showModal2();
+    el('pcm-title2').textContent = 'Subsystem: ' + ssShort(ss);
+    el('pcm-sub2').textContent = (sysNo ? 'System ' + sysNo + ' · ' : '') + (desc || '') +
+      '  ·  ' + (cssc ? 'CSSC ✓ ĐẠT' : 'DAC ' + dacN + '/' + discN + ' — chưa CSSC') +
+      '  ·  ITR-A ' + d.itr.length + ' · Punch ' + d.pun.length + ' dòng';
+
+    var itrRows = d.itr.map(function (r, i) {
+      var done = r.complete_date && String(r.complete_date).trim() !== '';
+      return '<tr class="' + (done ? 'done' : '') + '"><td>' + (i + 1) + '</td><td><b>' + esc(r.tag_no) + '</b></td>' +
+        '<td>' + esc(r.tag_desc) + '</td><td>' + esc(r.discipline) + '</td><td>' + esc(r.cs_type) + '</td>' +
+        '<td>' + _day(r.plan_start) + '</td><td>' + _day(r.plan_finish) + '</td>' +
+        '<td>' + (done ? _day(r.complete_date) : '') + '</td><td>' + esc(r.norm) + '</td></tr>';
+    });
+    var punRows = d.pun.map(function (r, i) {
+      var closed = String(r.status || '').trim().toUpperCase() === 'CLOSED';
+      var openA = !closed && String(r.category || '').trim().toUpperCase() === 'A';
+      return '<tr class="' + (closed ? 'done' : (openA ? 'opa' : '')) + '"><td>' + (i + 1) + '</td>' +
+        '<td><b>' + esc(r.punch_no) + '</b></td><td style="text-align:center;font-weight:800;">' + esc(r.category) + '</td>' +
+        '<td>' + esc(r.phase) + '</td><td>' + esc(r.status) + '</td><td>' + esc(r.discipline) + '</td><td>' + esc(r.tag_no) + '</td>' +
+        '<td style="min-width:220px;white-space:normal;">' + esc(String(r.description || '')) + '</td>' +
+        '<td>' + esc(r.action_by) + '</td><td>' + _day(r.open_date) + '</td><td>' + _day(r.closed_date) + '</td><td>' + _day(r.expected_date) + '</td></tr>';
+    });
+
+    el('pcm-body2').innerHTML =
+      '<div class="pcm-kpis">' +
+        kbox('ITR-A Done', itDone, itTot, '#0369a1') +
+        kbox('Punch A Closed', paC, paT, '#dc2626') +
+        kbox('Punch B Closed', pbC, pbT, '#d97706') +
+        kbox('DAC (Discipline)', dacN, discN, '#7c3aed') + '</div>' +
+      '<div class="pcm-chartbox"><canvas id="pcm-chart2"></canvas></div>' +
+      reportTable('ITR-A Checksheets', ['#', 'TagNo', 'Description', 'Disc', 'CS Type', 'Plan Start', 'Plan Finish', 'Complete', 'Norm'], itrRows) +
+      reportTable('Punch List  (đỏ = Cat A Open · xanh = Closed)',
+        ['#', 'PunchNo', 'Cat', 'Phase', 'Status', 'Disc', 'TagNo', 'Defect Description', 'Action By', 'Open', 'Closed', 'Expected'], punRows);
+    if (_mchart2) { try { _mchart2.destroy(); } catch (e) {} _mchart2 = null; }
+    _mchart2 = drawSCurve(el('pcm-chart2'), sc);
+    el('pcm-export2').onclick = function () { exportScope('Subsystem ' + ssShort(ss), d); };
   }
   function _day(v) { return esc(String(v || '').slice(0, 10)); }
   function kbox(label, closed, total, color) {
@@ -1170,7 +1269,7 @@
       head = ['#', 'Subsystem', 'TagNo', 'Description', 'CS Type', 'Plan Finish', 'Complete'];
       rows = it.map(function (r, i) {
         var done = r.complete_date && String(r.complete_date).trim() !== '';
-        return '<tr class="' + (done ? 'done' : '') + '"><td>' + (i + 1) + '</td><td>' + esc(ssShort(r.subsystem)) + '</td>' +
+        return '<tr class="' + (done ? 'done' : '') + '"><td>' + (i + 1) + '</td>' + ssCell(r.subsystem) +
           '<td><b>' + esc(r.tag_no) + '</b></td><td>' + esc(r.tag_desc) + '</td><td>' + esc(r.cs_type) + '</td>' +
           '<td>' + _day(r.plan_finish) + '</td><td>' + (done ? G(_day(r.complete_date)) : '') + '</td></tr>';
       });
@@ -1182,7 +1281,7 @@
       head = ['#', 'Subsystem', 'PunchNo', 'Phase', 'Status', 'TagNo', 'Defect Description', 'Action By', 'Open', 'Closed'];
       rows = pu.map(function (r, i) {
         var cl = String(r.status || '').trim().toUpperCase() === 'CLOSED';
-        return '<tr class="' + (cl ? 'done' : 'opa') + '"><td>' + (i + 1) + '</td><td>' + esc(ssShort(r.subsystem)) + '</td>' +
+        return '<tr class="' + (cl ? 'done' : 'opa') + '"><td>' + (i + 1) + '</td>' + ssCell(r.subsystem) +
           '<td><b>' + esc(r.punch_no) + '</b></td><td>' + esc(r.phase) + '</td><td>' + (cl ? G(esc(r.status)) : esc(r.status)) + '</td>' +
           '<td>' + esc(r.tag_no) + '</td><td style="min-width:220px;white-space:normal;">' + esc(String(r.description || '')) + '</td>' +
           '<td>' + esc(r.action_by) + '</td><td>' + _day(r.open_date) + '</td><td>' + _day(r.closed_date) + '</td></tr>';
@@ -1194,7 +1293,7 @@
       rows = sr.map(function (r, i) {
         var dac = (r.itr_done >= r.itr_total && r.pao === 0);
         return '<tr class="' + (dac ? 'done' : '') + '"><td>' + (i + 1) + '</td><td>' + esc(r.system_no) + '</td>' +
-          '<td><b>' + esc(ssShort(r.subsystem)) + '</b></td><td>' + esc(r.subsystem_desc) + '</td>' +
+          ssCell(r.subsystem, true) + '<td>' + esc(r.subsystem_desc) + '</td>' +
           '<td>' + G(r.itr_done) + '/' + r.itr_total + '</td><td class="' + pctCls(pct(r.itr_done, r.itr_total)) + '">' + pct(r.itr_done, r.itr_total) + '%</td>' +
           '<td>' + (r.pat ? G(r.pat - r.pao) + '/' + r.pat : '–') + '</td><td>' + (r.pbt ? G(r.pbt - r.pbo) + '/' + r.pbt : '–') + '</td>' +
           '<td><b>' + (dac ? G('DAC ✓') : '-') + '</b></td></tr>';
@@ -1246,7 +1345,7 @@
 
     function punRowHtml(r, i) {
       var cl = String(r.status || '').trim().toUpperCase() === 'CLOSED';
-      return '<tr class="' + (cl ? 'done' : 'opa') + '"><td>' + (i + 1) + '</td><td>' + esc(r.system_no) + '</td><td>' + esc(ssShort(r.subsystem)) + '</td>' +
+      return '<tr class="' + (cl ? 'done' : 'opa') + '"><td>' + (i + 1) + '</td><td>' + esc(r.system_no) + '</td>' + ssCell(r.subsystem) +
         '<td><b>' + esc(r.punch_no) + '</b></td><td>' + esc(r.discipline) + '</td><td>' + esc(r.phase) + '</td>' +
         '<td>' + (cl ? '<span style="color:#059669;font-weight:700;">' + esc(r.status) + '</span>' : esc(r.status)) + '</td>' +
         '<td>' + esc(r.tag_no) + '</td><td style="min-width:220px;white-space:normal;">' + esc(String(r.description || '')) + '</td>' +
