@@ -154,6 +154,13 @@
     '.pcm-ss-link:hover{background:#e8f0fe;}' +
     '.pcm-ss-link b{color:#0369a1!important;}' +
     '#pcm-modal2{z-index:100010;}' +   // cua so cap 2 nam TREN modal cap 1 (99999)
+    // ---- Bang discipline-modal: khung cuon rieng => header STICKY dung (fix header troi) + dong click-duoc ----
+    '.pcm-rpt-cap{font-weight:800;color:#0f2647;font-size:.82rem;padding:8px 2px 6px;}' +
+    '.pcm-rpt-scroll{max-height:58vh;overflow:auto;position:relative;border:1px solid #dbe2ea;border-radius:8px;}' +
+    '.pcm-rpt-scroll .pcm-rpt{margin:0;box-shadow:none;}' +
+    '.pcm-rpt-scroll .pcm-rpt thead th{position:sticky;top:0;z-index:5;}' +
+    '.pcm-drow{cursor:pointer;}' +
+    '.pcm-drow:hover td{background:#dbe9ff!important;}' +
     '</style>';
 
   function ssShort(ss) { return String(ss || '').replace(/^CPPT-/i, ''); }
@@ -929,10 +936,15 @@
     el('pcm-close').onclick = closeModal;
     m.addEventListener('click', function (e) { if (e.target === m) closeModal(); });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && el('pcm-modal') && el('pcm-modal').classList.contains('show')) closeModal(); });
-    // Delegated: click o Subsystem (data-ssdrill) trong bat ky bang modal cap 1 -> cua so cap 2.
+    // Delegated: click CA DONG (data-ssrow) trong bang modal cap 1 -> cua so cap 2 (ITR/Punch/DAC).
     el('pcm-body').addEventListener('click', function (e) {
-      var td = e.target.closest('[data-ssdrill]'); if (!td) return;
-      e.stopPropagation(); openSubsystemWindow(td.getAttribute('data-ssdrill'));
+      var tr = e.target.closest('[data-ssrow]'); if (!tr) return;
+      e.stopPropagation();
+      openSubsystemWindow(tr.getAttribute('data-ssrow'), {
+        disc: tr.getAttribute('data-disc') || null,
+        tag: tr.getAttribute('data-tag') || null,
+        punch: tr.getAttribute('data-punch') || null
+      });
     });
   }
   function showModal() { ensureModal(); el('pcm-modal').classList.add('show'); }
@@ -970,26 +982,76 @@
     if (_mchart2) { try { _mchart2.destroy(); } catch (e) {} _mchart2 = null; }
   }
   // Mo cua so cap 2 cho 1 subsystem (modal cap 1 van giu phia sau). ss = ma day du (co CPPT-).
-  function openSubsystemWindow(ss) {
-    var sc = scopeWhereFor({ type: 'ss', ss: ss }, '__ALL__');   // pham vi = rieng subsystem nay
-    var d = detailQueries(sc);
-    var srows = window.PrecomDB.query(
-      'SELECT discipline, system_no, subsystem_desc, itr_total, itr_done,' +
-      ' COALESCE(punch_a_total,0) pat, COALESCE(punch_a_open,0) pao,' +
-      ' COALESCE(punch_b_total,0) pbt, COALESCE(punch_b_open,0) pbo' +
-      ' FROM precom_summary WHERE UPPER(TRIM(subsystem))=? ORDER BY discipline', [ss]);
+  function openSubsystemWindow(ss, opts) {
+    // opts = {disc, tag, punch}. Backward-compat: chuoi = disc. Detail 2 LOC dung theo dong click:
+    //   - dong subsystem-summary -> subsystem x discipline (disc)
+    //   - dong ITR checksheet     -> rieng TAG do
+    //   - dong Punch              -> rieng PUNCH do (+ ITR cung tag lam ngu canh)
+    if (typeof opts === 'string') opts = { disc: opts };
+    opts = opts || {};
+    var disc = opts.disc || null, tag = opts.tag || null, punch = opts.punch || null;
+    var TAG = tag ? String(tag).trim().toUpperCase() : null;
+    var PUN = punch ? String(punch).trim().toUpperCase() : null;
+
+    var sc, d, titleSuffix = '';
     var itDone = 0, itTot = 0, paC = 0, paT = 0, pbC = 0, pbT = 0, dacN = 0, discN = 0, sysNo = '', desc = '';
-    srows.forEach(function (r) {
-      itDone += r.itr_done; itTot += r.itr_total;
-      paC += (r.pat - r.pao); paT += r.pat; pbC += (r.pbt - r.pbo); pbT += r.pbt;
-      sysNo = r.system_no || sysNo; desc = r.subsystem_desc || desc;
-      if (r.itr_total || r.pat || r.pbt) { discN++; if (r.itr_done >= r.itr_total && r.pao === 0) dacN++; }
-    });
+
+    if (punch) {
+      d = {
+        pun: window.PrecomDB.query(
+          'SELECT punch_no, punch_raised_no, category, status, discipline, tag_no, drawing_no, description,' +
+          ' corrective_action, action_by, raise_by, open_date, closed_date, expected_date, phase, package, subsystem, system_no' +
+          ' FROM punch_list WHERE UPPER(TRIM(punch_no))=?' + (ss ? ' AND UPPER(TRIM(subsystem))=?' : ''),
+          ss ? [PUN, ss] : [PUN]),
+        itr: TAG ? window.PrecomDB.query(
+          'SELECT system_no, subsystem, tag_no, tag_desc, discipline, cs_type, plan_start, plan_finish, complete_date, norm, location' +
+          ' FROM itr_a WHERE UPPER(TRIM(subsystem))=? AND UPPER(TRIM(tag_no))=? ORDER BY discipline, cs_type', [ss, TAG]) : []
+      };
+      sc = TAG ? { sql: ' AND UPPER(TRIM(subsystem))=? AND UPPER(TRIM(tag_no))=?', params: [ss, TAG] }
+               : { sql: ' AND UPPER(TRIM(subsystem))=?', params: [ss] };
+      titleSuffix = ' · Punch ' + punch;
+    } else if (tag) {
+      sc = { sql: ' AND UPPER(TRIM(subsystem))=? AND UPPER(TRIM(tag_no))=?', params: [ss, TAG] };
+      d = detailQueries(sc);
+      titleSuffix = ' · Tag ' + tag;
+    } else {
+      sc = disc ? scopeWhereFor({ type: 'cell', ss: ss, disc: disc }, '__ALL__')
+                : scopeWhereFor({ type: 'ss', ss: ss }, '__ALL__');
+      d = detailQueries(sc);
+      if (disc) titleSuffix = ' · ' + disc;
+    }
+
+    if (!tag && !punch) {
+      var srows = window.PrecomDB.query(
+        'SELECT discipline, system_no, subsystem_desc, itr_total, itr_done,' +
+        ' COALESCE(punch_a_total,0) pat, COALESCE(punch_a_open,0) pao,' +
+        ' COALESCE(punch_b_total,0) pbt, COALESCE(punch_b_open,0) pbo' +
+        ' FROM precom_summary WHERE UPPER(TRIM(subsystem))=?' +
+        (disc ? ' AND UPPER(TRIM(discipline))=?' : '') + ' ORDER BY discipline',
+        disc ? [ss, disc.toUpperCase()] : [ss]);
+      srows.forEach(function (r) {
+        itDone += r.itr_done; itTot += r.itr_total;
+        paC += (r.pat - r.pao); paT += r.pat; pbC += (r.pbt - r.pbo); pbT += r.pbt;
+        sysNo = r.system_no || sysNo; desc = r.subsystem_desc || desc;
+        if (r.itr_total || r.pat || r.pbt) { discN++; if (r.itr_done >= r.itr_total && r.pao === 0) dacN++; }
+      });
+    } else {
+      d.itr.forEach(function (r) {
+        itTot++; if (r.complete_date && String(r.complete_date).trim() !== '') itDone++;
+        sysNo = r.system_no || sysNo;
+      });
+      d.pun.forEach(function (r) {
+        var c = String(r.category || '').trim().toUpperCase();
+        var closed = String(r.status || '').trim().toUpperCase() === 'CLOSED';
+        if (c === 'A') { paT++; if (closed) paC++; } else if (c === 'B') { pbT++; if (closed) pbC++; }
+        sysNo = r.system_no || sysNo;
+      });
+    }
     var cssc = (discN > 0 && dacN >= discN);
     showModal2();
-    el('pcm-title2').textContent = 'Subsystem: ' + ssShort(ss);
+    el('pcm-title2').textContent = 'Subsystem: ' + ssShort(ss) + titleSuffix;
     el('pcm-sub2').textContent = (sysNo ? 'System ' + sysNo + ' · ' : '') + (desc || '') +
-      '  ·  ' + (cssc ? 'CSSC ✓ ĐẠT' : 'DAC ' + dacN + '/' + discN + ' — chưa CSSC') +
+      ((discN > 0) ? ('  ·  ' + (cssc ? 'CSSC ✓ ĐẠT' : 'DAC ' + dacN + '/' + discN)) : '') +
       '  ·  ITR-A ' + d.itr.length + ' · Punch ' + d.pun.length + ' dòng';
 
     var itrRows = d.itr.map(function (r, i) {
@@ -1021,7 +1083,7 @@
         ['#', 'PunchNo', 'Cat', 'Phase', 'Status', 'Disc', 'TagNo', 'Defect Description', 'Action By', 'Open', 'Closed', 'Expected'], punRows);
     if (_mchart2) { try { _mchart2.destroy(); } catch (e) {} _mchart2 = null; }
     _mchart2 = drawSCurve(el('pcm-chart2'), sc);
-    el('pcm-export2').onclick = function () { exportScope('Subsystem ' + ssShort(ss), d); };
+    el('pcm-export2').onclick = function () { exportScope('Subsystem ' + ssShort(ss) + titleSuffix, d); };
   }
   function _day(v) { return esc(String(v || '').slice(0, 10)); }
   function kbox(label, closed, total, color) {
@@ -1036,6 +1098,15 @@
       head.map(function (h) { return '<th>' + esc(h) + '</th>'; }).join('') + '</tr></thead><tbody>' +
       (rows.join('') || '<tr><td colspan="' + head.length + '" style="text-align:center;padding:1rem;">Không có dữ liệu.</td></tr>') +
       '</tbody></table>';
+  }
+  // Nhu reportTable nhung header STICKY (khung cuon rieng .pcm-rpt-scroll) + rows la pcm-drow click-duoc.
+  function stickyTable(caption, head, rows) {
+    return '<div class="pcm-rpt-cap">' + esc(caption) +
+      ' <span style="font-weight:400;color:#5b6b80;font-size:.66rem;">· Click 1 dòng để xem chi tiết ITR / Punch / DAC của subsystem</span></div>' +
+      '<div class="pcm-rpt-scroll"><table class="pcm-rpt"><thead><tr>' +
+      head.map(function (h) { return '<th>' + esc(h) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      (rows.join('') || '<tr><td colspan="' + head.length + '" style="text-align:center;padding:1rem;">Không có dữ liệu.</td></tr>') +
+      '</tbody></table></div>';
   }
   // Thanh TONG HOP theo DISCIPLINE trong modal (Punch / CSSC). Moi o = 1 discipline (kem 'Tất cả'),
   // hien a/b + %. Click -> loc bang duoi. Tai dung style .pcm-kbox (da co hover + .sel).
@@ -1269,7 +1340,7 @@
       head = ['#', 'Subsystem', 'TagNo', 'Description', 'CS Type', 'Plan Finish', 'Complete'];
       rows = it.map(function (r, i) {
         var done = r.complete_date && String(r.complete_date).trim() !== '';
-        return '<tr class="' + (done ? 'done' : '') + '"><td>' + (i + 1) + '</td>' + ssCell(r.subsystem) +
+        return '<tr class="pcm-drow ' + (done ? 'done' : '') + '" data-ssrow="' + esc(r.subsystem) + '" data-disc="' + esc(_discCtx.disc) + '" data-tag="' + esc(r.tag_no) + '"><td>' + (i + 1) + '</td><td>' + esc(ssShort(r.subsystem)) + '</td>' +
           '<td><b>' + esc(r.tag_no) + '</b></td><td>' + esc(r.tag_desc) + '</td><td>' + esc(r.cs_type) + '</td>' +
           '<td>' + _day(r.plan_finish) + '</td><td>' + (done ? G(_day(r.complete_date)) : '') + '</td></tr>';
       });
@@ -1281,7 +1352,7 @@
       head = ['#', 'Subsystem', 'PunchNo', 'Phase', 'Status', 'TagNo', 'Defect Description', 'Action By', 'Open', 'Closed'];
       rows = pu.map(function (r, i) {
         var cl = String(r.status || '').trim().toUpperCase() === 'CLOSED';
-        return '<tr class="' + (cl ? 'done' : 'opa') + '"><td>' + (i + 1) + '</td>' + ssCell(r.subsystem) +
+        return '<tr class="pcm-drow ' + (cl ? 'done' : 'opa') + '" data-ssrow="' + esc(r.subsystem) + '" data-disc="' + esc(_discCtx.disc) + '" data-tag="' + esc(r.tag_no) + '" data-punch="' + esc(r.punch_no) + '"><td>' + (i + 1) + '</td><td>' + esc(ssShort(r.subsystem)) + '</td>' +
           '<td><b>' + esc(r.punch_no) + '</b></td><td>' + esc(r.phase) + '</td><td>' + (cl ? G(esc(r.status)) : esc(r.status)) + '</td>' +
           '<td>' + esc(r.tag_no) + '</td><td style="min-width:220px;white-space:normal;">' + esc(String(r.description || '')) + '</td>' +
           '<td>' + esc(r.action_by) + '</td><td>' + _day(r.open_date) + '</td><td>' + _day(r.closed_date) + '</td></tr>';
@@ -1292,15 +1363,15 @@
       head = ['#', 'System', 'Subsystem', 'Description', 'ITR done/total', '%ITR', 'PunchA', 'PunchB', 'DAC'];
       rows = sr.map(function (r, i) {
         var dac = (r.itr_done >= r.itr_total && r.pao === 0);
-        return '<tr class="' + (dac ? 'done' : '') + '"><td>' + (i + 1) + '</td><td>' + esc(r.system_no) + '</td>' +
-          ssCell(r.subsystem, true) + '<td>' + esc(r.subsystem_desc) + '</td>' +
+        return '<tr class="pcm-drow ' + (dac ? 'done' : '') + '" data-ssrow="' + esc(r.subsystem) + '" data-disc="' + esc(_discCtx.disc) + '"><td>' + (i + 1) + '</td><td>' + esc(r.system_no) + '</td>' +
+          '<td><b>' + esc(ssShort(r.subsystem)) + '</b></td><td>' + esc(r.subsystem_desc) + '</td>' +
           '<td>' + G(r.itr_done) + '/' + r.itr_total + '</td><td class="' + pctCls(pct(r.itr_done, r.itr_total)) + '">' + pct(r.itr_done, r.itr_total) + '%</td>' +
           '<td>' + (r.pat ? G(r.pat - r.pao) + '/' + r.pat : '–') + '</td><td>' + (r.pbt ? G(r.pbt - r.pbo) + '/' + r.pbt : '–') + '</td>' +
           '<td><b>' + (dac ? G('DAC ✓') : '-') + '</b></td></tr>';
       });
     }
     var t = el('pcm-disc-table');
-    if (t) t.innerHTML = reportTable(cap, head, rows);
+    if (t) t.innerHTML = stickyTable(cap, head, rows);
   }
   function exportDiscipline(disc, srows, d) {
     var sub = _rptSub('Discipline ' + disc + (state.system === '__ALL__' ? '' : ' · System ' + state.system));
@@ -1345,7 +1416,7 @@
 
     function punRowHtml(r, i) {
       var cl = String(r.status || '').trim().toUpperCase() === 'CLOSED';
-      return '<tr class="' + (cl ? 'done' : 'opa') + '"><td>' + (i + 1) + '</td><td>' + esc(r.system_no) + '</td>' + ssCell(r.subsystem) +
+      return '<tr class="pcm-drow ' + (cl ? 'done' : 'opa') + '" data-ssrow="' + esc(r.subsystem) + '" data-disc="' + esc(r.discipline) + '" data-tag="' + esc(r.tag_no) + '" data-punch="' + esc(r.punch_no) + '"><td>' + (i + 1) + '</td><td>' + esc(r.system_no) + '</td><td>' + esc(ssShort(r.subsystem)) + '</td>' +
         '<td><b>' + esc(r.punch_no) + '</b></td><td>' + esc(r.discipline) + '</td><td>' + esc(r.phase) + '</td>' +
         '<td>' + (cl ? '<span style="color:#059669;font-weight:700;">' + esc(r.status) + '</span>' : esc(r.status)) + '</td>' +
         '<td>' + esc(r.tag_no) + '</td><td style="min-width:220px;white-space:normal;">' + esc(String(r.description || '')) + '</td>' +
@@ -1359,7 +1430,7 @@
         (disc ? ' · Discipline: ' + disc : ' · Tất cả discipline');
       el('pcm-dfwrap').innerHTML =
         pcmDiscBar(items, disc) +
-        reportTable('Punch ' + phase + '_' + cat + '  (đỏ = Open · xanh = Closed)',
+        stickyTable('Punch ' + phase + '_' + cat + '  (đỏ = Open · xanh = Closed)',
           ['#', 'System', 'Subsystem', 'PunchNo', 'Discipline', 'Phase', 'Status', 'TagNo', 'Defect Description', 'Action By', 'Open', 'Closed', 'Expected'],
           fr.map(punRowHtml));
       wireDiscFilter(el('pcm-dfwrap'));
