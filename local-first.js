@@ -40,13 +40,25 @@
   // Flange management columns exist only after the flange upload rebuilds the DB.
   // Inject them only when present so older DBs don't error on a missing column.
   function packagesSql() {
+    var sql = PACKAGES_SQL;
     var flange = "0 AS flangeTotalCount, 0 AS flangeDoneCount,";
     try {
       var cols = window.LocalDB.query("PRAGMA table_info(testpack_summary)").map(function (r) { return r.name; });
       if (cols.indexOf('flange_total') >= 0)
         flange = "COALESCE(s.flange_total,0) AS flangeTotalCount, COALESCE(s.flange_done,0) AS flangeDoneCount,";
     } catch (e) {}
-    return PACKAGES_SQL.replace('/*FLANGE*/', flange);
+    sql = sql.replace('/*FLANGE*/', flange);
+    // PHONG THU cot tp.* (test_packages tu Google Sheet): cot nao KHONG ton tai (vd sheet doi bo
+    // 'test_plan') -> thay bang NULL de query khong vo -> ca dashboard van hien du lieu Fabrication.
+    try {
+      var tcols = window.LocalDB.query("PRAGMA table_info(test_packages)").map(function (r) { return r.name; });
+      ['test_plan', 'ready_for_hydrotest', 'review_weld_sum', 'line_check', 'sign_p02a', 'flushing',
+       'sign_p03a', 'hydro_test', 'sign_p04a', 'bolting_completion', 'reinstatement', 'sign_p05a',
+       'sign_p06a', 'sign_p07a', 'inspector'].forEach(function (c) {
+        if (tcols.indexOf(c) < 0) sql = sql.replace(new RegExp('\\btp\\.' + c + '\\b', 'g'), 'NULL');
+      });
+    } catch (e) {}
+    return sql;
   }
 
   var _data = null, _dataP = null;       // combined (static + live); _dataP = in-flight guard
@@ -265,7 +277,14 @@
   // ---- Database tab / drill-down / dropdowns (raw piping_data) ---------------
   var TP_COLS = ['skyline', 'test_plan', 'ready_for_hydrotest', 'review_weld_sum', 'line_check', 'sign_p02a', 'flushing', 'sign_p03a', 'hydro_test', 'sign_p04a', 'bolting_completion', 'reinstatement', 'sign_p05a', 'sign_p06a', 'sign_p07a', 'inspector'];
   var snake = function (k) { return k.replace(/[A-Z]/g, function (l) { return '_' + l.toLowerCase(); }); };
-  var pref = function (c) { return TP_COLS.indexOf(c) >= 0 ? 'tp.' + c : 'j.' + c; };
+  // Chi route sang tp.<col> khi cot THUC SU ton tai trong test_packages (sheet co the doi cot,
+  // vd bo 'test_plan') -> tranh loi "no such column: tp.<col>". Cache, reset khi DB doi (localdb-updated).
+  var _tpActual = null;
+  function _tpHas(c) {
+    if (!_tpActual) { try { _tpActual = window.LocalDB.query("PRAGMA table_info(test_packages)").map(function (r) { return r.name; }); } catch (e) { _tpActual = TP_COLS.slice(); } }
+    return _tpActual.indexOf(c) >= 0;
+  }
+  var pref = function (c) { return (TP_COLS.indexOf(c) >= 0 && _tpHas(c)) ? 'tp.' + c : 'j.' + c; };
   var camel = function (o) { var n = {}; for (var k in o) n[k.replace(/_([a-z])/g, function (g) { return g[1].toUpperCase(); })] = o[k]; return n; };
 
   function databaseQuery(body) {
@@ -370,7 +389,7 @@
     if (typeof window.setDataStatus === 'function') { try { window.setDataStatus('loading', msg); } catch (e2) {} }
   });
   window.addEventListener('localdb-updated', function () {
-    _static = null; _staticP = null; _data = null; _dataP = null;   // DB đổi -> tính lại toàn bộ
+    _static = null; _staticP = null; _data = null; _dataP = null; _tpActual = null;   // DB đổi -> tính lại toàn bộ
     var done = function () { if (typeof window.setDataStatus === 'function') { try { window.setDataStatus('ready', 'Data up to date'); } catch (e) {} } };
     if (typeof window.reloadFreshData === 'function') { try { Promise.resolve(window.reloadFreshData()).then(done, done); } catch (e) { done(); } }
     else done();
