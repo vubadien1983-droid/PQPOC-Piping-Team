@@ -93,6 +93,12 @@
     try { var r = _db.exec('SELECT key, value FROM app_meta'); if (r[0]) r[0].values.forEach(function (row) { _meta[row[0]] = row[1]; }); } catch (e) {}
   }
 
+  // So dong piping_data trong DB dang nap (0 neu loi/rong) -> dung de tu phuc hoi cache hong.
+  function _dbRowCount() {
+    try { var r = _db.exec('SELECT COUNT(*) FROM piping_data'); return (r[0] && r[0].values[0][0]) || 0; }
+    catch (e) { return 0; }
+  }
+
   // ---- first-run loading overlay (informative; NOT a yes/no prompt) ----------
   function _overlay() {
     var ov = document.createElement('div');
@@ -169,12 +175,19 @@
     }).then(function (c) {
       var bytes = c[0], etag = c[1];
       if (bytes) {                                   // STALE-WHILE-REVALIDATE
-        _loadDB(bytes);                              // instant, cached (old) data
-        _maybeUpdate();                              // announce + pull newer data (non-blocking)
-        return;
+        var ok = false;
+        try { _loadDB(bytes); ok = _dbRowCount() > 0; } catch (e) { ok = false; }
+        if (ok) {
+          _maybeUpdate();                            // announce + pull newer data (non-blocking)
+          return;
+        }
+        // SELF-HEAL: cache rong/hong (0 dong hoac loi giai nen) -> xoa etag + tai lai tuoi
+        // (tranh 304 giu lai cache hong). Sau do roi xuong nhanh FIRST-RUN download ben duoi.
+        if (window.console) console.warn('[LocalDB] cached DB empty/corrupt -> purge cache + re-download');
+        try { _idbSet(KEY_ETAG, null); } catch (e) {}
       }
-      // FIRST RUN: must download once (progress overlay, no yes/no prompt)
-      if (document.body) _overlay();
+      // FIRST RUN (hoac cache hong): tai 1 lan (progress overlay, no yes/no prompt)
+      if (document.body && !document.getElementById('localdb-overlay')) _overlay();
       return _download({}, _overlayProgress).then(function (r) {
         return Promise.all([_idbSet(KEY_BYTES, r.bytes), r.etag ? _idbSet(KEY_ETAG, r.etag) : null]).then(function () {
           _loadDB(r.bytes); _overlayHide();
