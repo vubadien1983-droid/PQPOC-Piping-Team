@@ -23,6 +23,14 @@
   function esc(v) { return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
   function pct(d, t) { return t > 0 ? Math.round(d * 100 / t) : 0; }
   function pctCls(p) { return p >= 80 ? 'pcm-hi' : (p >= 40 ? 'pcm-mid' : 'pcm-lo'); }
+  // Chon cot AN TOAN: cot KHONG co trong bang -> 'NULL AS <cot>' de tranh loi SQL "no such column"
+  // khi nguon doi/bo cot (vd ITR-A moi bo PlanStart) -> detail/detail-2 khong bi vo.
+  function selSafe(table, cols) {
+    var have;
+    try { have = window.PrecomDB.query('PRAGMA table_info(' + table + ')').map(function (r) { return r.name; }); }
+    catch (e) { have = []; }
+    return cols.map(function (c) { return have.indexOf(c) >= 0 ? c : ('NULL AS ' + c); }).join(', ');
+  }
 
   var DISC_ORDER = ['MECHANICAL', 'PIPING', 'ELECTRICAL', 'INSTRUMENT', 'TELECOM',
                     'STRUCTURE', 'ARCHITECTURE', 'HVAC', 'SAFETY'];
@@ -429,7 +437,7 @@
   function detailQueries(sc) {
     sc = sc || scopeWhere();
     var itr = window.PrecomDB.query(
-      'SELECT system_no, subsystem, tag_no, tag_desc, discipline, cs_type, plan_start, plan_finish, complete_date, norm, location' +
+      'SELECT ' + selSafe('itr_a', ['system_no', 'subsystem', 'tag_no', 'tag_desc', 'discipline', 'cs_type', 'plan_start', 'plan_finish', 'complete_date', 'norm', 'location']) +
       ' FROM itr_a WHERE 1=1' + sc.sql +
       " ORDER BY (complete_date IS NOT NULL AND TRIM(complete_date)<>''), discipline, tag_no", sc.params);
     var pun = [];
@@ -895,8 +903,8 @@
     // Sheet 2: ITR-A raw theo pham vi
     var sc = all ? { sql: '', params: [] } : scopeWhere();
     var raw = window.PrecomDB.query(
-      'SELECT system_no, subsystem, subsystem_desc, tag_no, tag_desc, discipline, cs_type,' +
-      ' plan_start, plan_finish, complete_date, norm, location FROM itr_a WHERE 1=1' + sc.sql +
+      'SELECT ' + selSafe('itr_a', ['system_no', 'subsystem', 'subsystem_desc', 'tag_no', 'tag_desc', 'discipline', 'cs_type', 'plan_start', 'plan_finish', 'complete_date', 'norm', 'location']) +
+      ' FROM itr_a WHERE 1=1' + sc.sql +
       ' ORDER BY subsystem, discipline, tag_no', sc.params);
     var rawHead = ['System', 'Subsystem', 'Description', 'TagNo', 'Tag Description', 'Discipline', 'ITR', 'Plan Start', 'Plan Finish', 'Complete', 'Norm', 'Location'];
     var rawRows = raw.map(function (r) { return [r.system_no, r.subsystem, r.subsystem_desc, r.tag_no, r.tag_desc, r.discipline, r.cs_type, _day(r.plan_start), _day(r.plan_finish), _day(r.complete_date), r.norm, r.location]; });
@@ -1004,7 +1012,7 @@
           ' FROM punch_list WHERE UPPER(TRIM(punch_no))=?' + (ss ? ' AND UPPER(TRIM(subsystem))=?' : ''),
           ss ? [PUN, ss] : [PUN]),
         itr: TAG ? window.PrecomDB.query(
-          'SELECT system_no, subsystem, tag_no, tag_desc, discipline, cs_type, plan_start, plan_finish, complete_date, norm, location' +
+          'SELECT ' + selSafe('itr_a', ['system_no', 'subsystem', 'tag_no', 'tag_desc', 'discipline', 'cs_type', 'plan_start', 'plan_finish', 'complete_date', 'norm', 'location']) +
           ' FROM itr_a WHERE UPPER(TRIM(subsystem))=? AND UPPER(TRIM(tag_no))=? ORDER BY discipline, cs_type', [ss, TAG]) : []
       };
       sc = TAG ? { sql: ' AND UPPER(TRIM(subsystem))=? AND UPPER(TRIM(tag_no))=?', params: [ss, TAG] }
