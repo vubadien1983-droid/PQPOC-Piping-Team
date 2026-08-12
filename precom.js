@@ -1086,9 +1086,9 @@
         kbox('Punch B Closed', pbC, pbT, '#d97706') +
         kbox('DAC (Discipline)', dacN, discN, '#7c3aed') + '</div>' +
       '<div class="pcm-chartbox"><canvas id="pcm-chart2"></canvas></div>' +
-      reportTable('ITR-A Checksheets', ['#', 'TagNo', 'Description', 'Disc', 'CS Type', 'Plan Start', 'Plan Finish', 'Complete', 'Norm'], itrRows) +
-      reportTable('Punch List  (đỏ = Cat A Open · xanh = Closed)',
-        ['#', 'PunchNo', 'Cat', 'Phase', 'Status', 'Disc', 'TagNo', 'Defect Description', 'Action By', 'Open', 'Closed', 'Expected'], punRows);
+      scrollReport('ITR-A Checksheets (' + itrRows.length + ')', ['#', 'TagNo', 'Description', 'Disc', 'CS Type', 'Plan Start', 'Plan Finish', 'Complete', 'Norm'], itrRows, 32) +
+      scrollReport('Punch List (' + punRows.length + ')  ·  đỏ = Cat A Open · xanh = Closed',
+        ['#', 'PunchNo', 'Cat', 'Phase', 'Status', 'Disc', 'TagNo', 'Defect Description', 'Action By', 'Open', 'Closed', 'Expected'], punRows, 32);
     if (_mchart2) { try { _mchart2.destroy(); } catch (e) {} _mchart2 = null; }
     _mchart2 = drawSCurve(el('pcm-chart2'), sc);
     el('pcm-export2').onclick = function () { exportScope('Subsystem ' + ssShort(ss) + titleSuffix, d); };
@@ -1112,6 +1112,15 @@
     return '<div class="pcm-rpt-cap">' + esc(caption) +
       ' <span style="font-weight:400;color:#5b6b80;font-size:.66rem;">· Click 1 dòng để xem chi tiết ITR / Punch / DAC của subsystem</span></div>' +
       '<div class="pcm-rpt-scroll"><table class="pcm-rpt"><thead><tr>' +
+      head.map(function (h) { return '<th>' + esc(h) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      (rows.join('') || '<tr><td colspan="' + head.length + '" style="text-align:center;padding:1rem;">Không có dữ liệu.</td></tr>') +
+      '</tbody></table></div>';
+  }
+  // Nhu reportTable nhung THU NHO chieu cao (khung cuon rieng, header sticky) -> nhieu bang cung
+  // hien trong 1 man hinh (vd ITR-A + Punch cung thay, khong phai cuon qua het bang ITR-A).
+  function scrollReport(caption, head, rows, maxvh) {
+    return '<div class="pcm-rpt-cap">' + esc(caption) + '</div>' +
+      '<div class="pcm-rpt-scroll" style="max-height:' + (maxvh || 34) + 'vh;"><table class="pcm-rpt"><thead><tr>' +
       head.map(function (h) { return '<th>' + esc(h) + '</th>'; }).join('') + '</tr></thead><tbody>' +
       (rows.join('') || '<tr><td colspan="' + head.length + '" style="text-align:center;padding:1rem;">Không có dữ liệu.</td></tr>') +
       '</tbody></table></div>';
@@ -1209,8 +1218,8 @@
         (disc ? ' · Discipline: ' + disc : ' · Tất cả discipline');
       el('pcm-dfwrap').innerHTML =
         pcmDiscBar(items, disc) +
-        reportTable('ITR-A Checksheets', ['#', 'TagNo', 'Description', 'Disc', 'ITR', 'Plan Start', 'Plan Finish', 'Complete', 'Norm'], itrRowsHtml(fitr)) +
-        reportTable('Punch List  (đỏ = Cat A Open · xanh = Closed)', ['#', 'PunchNo', 'Cat', 'Phase', 'Status', 'Disc', 'TagNo', 'Defect Description', 'Action By', 'Open', 'Closed', 'Expected'], punRowsHtml(fpun));
+        scrollReport('ITR-A Checksheets (' + fitr.length + ')', ['#', 'TagNo', 'Description', 'Disc', 'ITR', 'Plan Start', 'Plan Finish', 'Complete', 'Norm'], itrRowsHtml(fitr), 32) +
+        scrollReport('Punch List (' + fpun.length + ')  ·  đỏ = Cat A Open · xanh = Closed', ['#', 'PunchNo', 'Cat', 'Phase', 'Status', 'Disc', 'TagNo', 'Defect Description', 'Action By', 'Open', 'Closed', 'Expected'], punRowsHtml(fpun), 32);
       wireDiscFilter(el('pcm-dfwrap'));
       el('pcm-export').onclick = function () { exportScope(label + (disc ? ' · ' + disc : ''), { itr: fitr, pun: fpun }); };
     }
