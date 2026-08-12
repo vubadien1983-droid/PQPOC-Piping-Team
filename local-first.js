@@ -169,7 +169,7 @@
           if (liveList) _liveSig = JSON.stringify(liveList);
           var list = (liveList && liveList.length) ? liveList : fallback;
           var map = new Map();
-          list.forEach(function (p) { map.set(String(p.testPackageNo).toUpperCase(), { hydro: p.hydro || '', reinst: p.reinst || '', note: p.note || '' }); });
+          list.forEach(function (p) { map.set(String(p.testPackageNo).trim().toUpperCase(), { hydro: p.hydro || '', reinst: p.reinst || '', note: p.note || '' }); });
           _data = { packages: s.packages, daily: s.daily, live: { ok: list.length > 0, list: list, map: map }, meta: s.meta, diaTotal: s.diaTotal, weldedDia: s.weldedDia, diaByDay: s.diaByDay, materialProgress: s.materialProgress, materialByDay: s.materialByDay, flangeByMaterial: s.flangeByMaterial };
           return _data;
         });
@@ -184,8 +184,8 @@
     'pmiRequiredCount', 'pmiDoneCount', 'pwhtRequiredCount', 'pwhtDoneCount',
     'hardnessRequiredCount', 'hardnessDoneCount', 'flangeTotalCount', 'flangeDoneCount'];
 
-  function hydroDone(p, live) { var v = live.map.get(String(p.testPackageNo).toUpperCase()); return live.ok ? !!(v && v.hydro) : p.hydroStatus === 'Done'; }
-  function reinstDone(p, live) { var v = live.map.get(String(p.testPackageNo).toUpperCase()); return live.ok ? !!(v && v.reinst) : p.reinstStatus === 'Done'; }
+  function hydroDone(p, live) { var v = live.map.get(String(p.testPackageNo).trim().toUpperCase()); return live.ok ? !!(v && v.hydro) : p.hydroStatus === 'Done'; }
+  function reinstDone(p, live) { var v = live.map.get(String(p.testPackageNo).trim().toUpperCase()); return live.ok ? !!(v && v.reinst) : p.reinstStatus === 'Done'; }
 
   function buildPackages(sys, d) {
     var live = d.live, byTP = {};
@@ -198,7 +198,7 @@
     });
     return Object.keys(byTP).map(function (k) {
       var o = byTP[k]; o.joints = [];
-      var v = live.ok ? live.map.get(String(o.testPackageNo).toUpperCase()) : null;
+      var v = live.ok ? live.map.get(String(o.testPackageNo).trim().toUpperCase()) : null;
       o.hydroStatus = (v && v.hydro) ? 'Done' : (live.ok ? '' : o.hydroStatus);
       o.hydroDate = (v && v.hydro) ? v.hydro : (live.ok ? null : o.hydroDate);
       o.reinstStatus = (v && v.reinst) ? 'Done' : (live.ok ? '' : o.reinstStatus);
@@ -225,7 +225,7 @@
     var systems = {}, fab = new Set(), sh = 0, sr = 0;
     d.packages.forEach(function (p) {
       if (p.system) systems[p.system] = 1;
-      if (p.testPackageNo) fab.add(String(p.testPackageNo).toUpperCase());
+      if (p.testPackageNo) fab.add(String(p.testPackageNo).trim().toUpperCase());
       s.joints += p.totalJoints || 0; s.weldDone += p.weldingDoneCount || 0;
       s.rt.req += p.rtRequiredCount || 0; s.rt.done += p.rtDoneCount || 0;
       s.paut.req += p.pautRequiredCount || 0; s.paut.done += p.pautDoneCount || 0;
@@ -238,7 +238,7 @@
       if (p.testPackageNo && p.reinstStatus === 'Done') sr++;
     });
     var tpTotal = fab.size, hd, rd, nif, st;
-    if (live.ok) { hd = 0; rd = 0; nif = 0; live.list.forEach(function (p) { var up = String(p.testPackageNo).toUpperCase(); if (p.hydro) hd++; if (p.reinst && fab.has(up)) rd++; if (!fab.has(up)) nif++; }); st = live.list.length; }
+    if (live.ok) { hd = 0; rd = 0; nif = 0; live.list.forEach(function (p) { var up = String(p.testPackageNo).trim().toUpperCase(); if (p.hydro) hd++; if (p.reinst && fab.has(up)) rd++; if (!fab.has(up)) nif++; }); st = live.list.length; }
     else { hd = sh; rd = sr; nif = 0; st = 0; }
     return { projectTotals: { systemCount: Object.keys(systems).length, joints: s.joints, weldDone: s.weldDone, rt: s.rt, paut: s.paut, ut: { req: 0, done: 0 }, mt: s.mt, pt: s.pt, pmi: s.pmi, pwht: s.pwht, hardness: s.hardness, tpTotal: tpTotal, hydro: { req: tpTotal, done: hd, notInFab: nif, sheetTotal: st, live: live.ok }, reinst: { req: tpTotal, done: rd }, diaInch: { done: d.weldedDia || 0, total: d.diaTotal || 0 }, materialProgress: d.materialProgress || [], flangeByMaterial: d.flangeByMaterial || [], leak: { req: tpTotal, done: 0, tracked: false } } };
   }
@@ -329,8 +329,8 @@
   }
 
   function hydroNotInFab(d) {
-    var fab = new Set(); d.packages.forEach(function (p) { if (p.testPackageNo) fab.add(String(p.testPackageNo).toUpperCase()); });
-    return d.live.list.filter(function (p) { return !fab.has(String(p.testPackageNo).toUpperCase()); })
+    var fab = new Set(); d.packages.forEach(function (p) { if (p.testPackageNo) fab.add(String(p.testPackageNo).trim().toUpperCase()); });
+    return d.live.list.filter(function (p) { return !fab.has(String(p.testPackageNo).trim().toUpperCase()); })
       .sort(function (a, b) { return a.testPackageNo.localeCompare(b.testPackageNo); })
       .map(function (p, i) { return { number: i + 1, testPackageNo: p.testPackageNo, hydroDate: p.hydro || '' }; });
   }
