@@ -101,7 +101,7 @@
     // ---- FULL-SCREEN MODAL + bang bao cao chuyen nghiep ----
     '.pcm-modal{position:fixed;inset:0;z-index:99999;display:none;background:rgba(15,23,42,.55);}' +
     '.pcm-modal.show{display:flex;}' +
-    '.pcm-win{margin:auto;width:96vw;height:94vh;background:#eef1f5;border-radius:10px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.45);}' +
+    '.pcm-win{margin:auto;width:100vw;height:100vh;max-width:100vw;max-height:100vh;background:#eef1f5;border-radius:0;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.45);}' +
     '.pcm-head{flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:10px 16px;background:linear-gradient(90deg,#0f2647,#1e3a63);color:#fff;}' +
     '.pcm-head h2{font-size:1rem;margin:0;font-weight:800;letter-spacing:.02em;white-space:nowrap;}' +
     '.pcm-head .pcm-sub{flex:1;font-size:.72rem;color:#c7d4e6;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}' +

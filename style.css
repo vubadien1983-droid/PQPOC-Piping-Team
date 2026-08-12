@@ -1204,13 +1204,13 @@ td.ndt-na-cell {
 }
 
 .modal-content {
-  width: 98vw;
-  max-width: 98vw;
-  height: 96vh;
-  max-height: 96vh;
+  width: 100vw;
+  max-width: 100vw;
+  height: 100vh;
+  max-height: 100vh;
   background: var(--bg-panel);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
+  border-radius: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
