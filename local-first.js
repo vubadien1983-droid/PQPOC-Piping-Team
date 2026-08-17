@@ -237,10 +237,15 @@
       if (p.testPackageNo && p.hydroStatus === 'Done') sh++;
       if (p.testPackageNo && p.reinstStatus === 'Done') sr++;
     });
-    var tpTotal = fab.size, hd, rd, nif, st;
-    if (live.ok) { hd = 0; rd = 0; nif = 0; live.list.forEach(function (p) { var up = String(p.testPackageNo).trim().toUpperCase(); if (p.hydro) hd++; if (p.reinst && fab.has(up)) rd++; if (!fab.has(up)) nif++; }); st = live.list.length; }
-    else { hd = sh; rd = sr; nif = 0; st = 0; }
-    return { projectTotals: { systemCount: Object.keys(systems).length, joints: s.joints, weldDone: s.weldDone, rt: s.rt, paut: s.paut, ut: { req: 0, done: 0 }, mt: s.mt, pt: s.pt, pmi: s.pmi, pwht: s.pwht, hardness: s.hardness, tpTotal: tpTotal, hydro: { req: tpTotal, done: hd, notInFab: nif, sheetTotal: st, live: live.ok }, reinst: { req: tpTotal, done: rd }, diaInch: { done: d.weldedDia || 0, total: d.diaTotal || 0 }, materialProgress: d.materialProgress || [], flangeByMaterial: d.flangeByMaterial || [], leak: { req: tpTotal, done: 0, tracked: false } } };
+    var tpTotal = fab.size, hd, rd, nif, fnis, st;
+    if (live.ok) {
+      hd = 0; rd = 0; nif = 0; var sheet = new Set();
+      live.list.forEach(function (p) { var up = String(p.testPackageNo).trim().toUpperCase(); sheet.add(up); if (p.hydro) hd++; if (p.reinst && fab.has(up)) rd++; if (!fab.has(up)) nif++; });
+      // fabNotInSheet: goi CO trong Fabrication nhung KHONG co trong Sheet (chieu nguoc lai cua notInFab)
+      fnis = 0; fab.forEach(function (up) { if (!sheet.has(up)) fnis++; }); st = live.list.length;
+    }
+    else { hd = sh; rd = sr; nif = 0; fnis = 0; st = 0; }
+    return { projectTotals: { systemCount: Object.keys(systems).length, joints: s.joints, weldDone: s.weldDone, rt: s.rt, paut: s.paut, ut: { req: 0, done: 0 }, mt: s.mt, pt: s.pt, pmi: s.pmi, pwht: s.pwht, hardness: s.hardness, tpTotal: tpTotal, hydro: { req: tpTotal, done: hd, notInFab: nif, fabNotInSheet: fnis, sheetTotal: st, live: live.ok }, reinst: { req: tpTotal, done: rd }, diaInch: { done: d.weldedDia || 0, total: d.diaTotal || 0 }, materialProgress: d.materialProgress || [], flangeByMaterial: d.flangeByMaterial || [], leak: { req: tpTotal, done: 0, tracked: false } } };
   }
 
   function parseDate(str) {
@@ -335,6 +340,20 @@
       .map(function (p, i) { return { number: i + 1, testPackageNo: p.testPackageNo, hydroDate: p.hydro || '' }; });
   }
 
+  function fabNotInSheet(d) {
+    if (!d.live.ok) return [];
+    var sheet = new Set(); d.live.list.forEach(function (p) { sheet.add(String(p.testPackageNo).trim().toUpperCase()); });
+    var seen = {}, out = [];
+    d.packages.forEach(function (p) {
+      if (!p.testPackageNo) return;
+      var up = String(p.testPackageNo).trim().toUpperCase();
+      if (seen[up] || sheet.has(up)) return;
+      seen[up] = 1; out.push({ testPackageNo: p.testPackageNo, system: p.system || '' });
+    });
+    return out.sort(function (a, b) { return a.testPackageNo.localeCompare(b.testPackageNo); })
+      .map(function (p, i) { return { number: i + 1, testPackageNo: p.testPackageNo, system: p.system }; });
+  }
+
   // ---- the router: serve /api/* from LocalDB ---------------------------------
   function jsonResponse(obj) { return { ok: true, status: 200, json: function () { return Promise.resolve(obj); }, text: function () { return Promise.resolve(JSON.stringify(obj)); } }; }
 
@@ -359,6 +378,7 @@
         if (view === 'systems') return jsonResponse(buildSystems(d));
         if (view === 'scurve') return jsonResponse(buildScurve(d));
         if (view === 'hydro-not-in-fab') return jsonResponse(hydroNotInFab(d));
+        if (view === 'fab-not-in-sheet') return jsonResponse(fabNotInSheet(d));
         if (view === 'syncmeta') return jsonResponse({ filename: d.meta.filename || null, fileTime: d.meta.fileTime || null, syncedAt: d.meta.builtAt || d.meta.version || null });
         if (view === 'live') return jsonResponse(d.live.list);
         return jsonResponse(buildTotals(d));

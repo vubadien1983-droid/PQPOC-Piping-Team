@@ -2659,6 +2659,12 @@ function renderDashboardZones() {
     if (hydro.notInFab > 0) { hNoteCount.textContent = hydro.notInFab; hNote.style.display = 'block'; }
     else { hNote.style.display = 'none'; }
   }
+  const fNote = document.getElementById('z1-fab-note');
+  const fNoteCount = document.getElementById('z1-fab-note-count');
+  if (fNote && fNoteCount) {
+    if (hydro.fabNotInSheet > 0) { fNoteCount.textContent = hydro.fabNotInSheet; fNote.style.display = 'block'; }
+    else { fNote.style.display = 'none'; }
+  }
 
   // Leak Test: số leak test đã Done (Testing done) / tổng gói leak test + % (từ leakTestLogic).
   // Nếu leakTestLogic chưa có dữ liệu (chưa mở tab & chưa nạp LEAK_TEST_DATA tĩnh) -> placeholder.
@@ -2872,6 +2878,8 @@ function setupDashboardInteractions() {
   // Red note -> export the hydro packages that are in the Sheet but not in fab
   const hNote = document.getElementById('z1-hydro-note');
   if (hNote) hNote.addEventListener('click', exportHydroNotInFab);
+  const fNoteEl = document.getElementById('z1-fab-note');
+  if (fNoteEl) fNoteEl.addEventListener('click', exportFabNotInSheet);
 
   // Zoom level buttons (Day / Week / Month)
   document.querySelectorAll('#chart-gran-toggle .gran-btn').forEach(btn => {
@@ -2911,6 +2919,40 @@ async function exportHydroNotInFab() {
     a.click(); URL.revokeObjectURL(url);
   } catch (err) {
     console.error('Export hydro-not-in-fab failed:', err);
+    alert('Export failed: ' + err.message);
+  }
+}
+
+// Export the test packages present in Fabrication Data but missing from the Sheet
+async function exportFabNotInSheet() {
+  try {
+    const res = await fetch(getApiUrl('/api/dashboard-summary?view=fab-not-in-sheet'));
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const list = await res.json();
+    if (!list.length) { alert('No discrepancy: all Fabrication packages exist in the Sheet.'); return; }
+    if (typeof ExcelJS === 'undefined') { alert('ExcelJS not loaded.'); return; }
+
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Fab Not In Sheet');
+    ws.columns = [
+      { header: 'Number', key: 'number', width: 10 },
+      { header: 'Test Package', key: 'testPackageNo', width: 36 },
+      { header: 'System', key: 'system', width: 14 }
+    ];
+    list.forEach(r => ws.addRow({ number: r.number, testPackageNo: r.testPackageNo, system: r.system }));
+    ws.getRow(1).eachCell(c => {
+      c.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } };
+      c.alignment = { horizontal: 'center' };
+    });
+    const buf = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'Fabrication_packages_not_in_Sheet.xlsx';
+    a.click(); URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error('Export fab-not-in-sheet failed:', err);
     alert('Export failed: ' + err.message);
   }
 }
