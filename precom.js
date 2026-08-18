@@ -14,7 +14,7 @@
 (function () {
   'use strict';
 
-  var state = { system: '__ALL__', q: '', onlyPending: false, inited: false,
+  var state = { system: '__ALL__', q: '', qTag: '', onlyPending: false, inited: false,
                 disciplines: [], sel: { type: 'all', ss: null, disc: null }, kpiSel: null };
   var _chart = null;
   var _click = false;   // TRUE chi khi user vua click -> cho phep auto-cuon 1 lan (refresh 3' KHONG cuon)
@@ -214,15 +214,18 @@
   function buildToolbar() {
     buildSystemDD();   // dropdown system tuy bien: hien CSSC-ready(xanh)/tong subsystem
     el('precom-search').oninput = function (e) { state.q = e.target.value.trim().toUpperCase(); render(); };
+    var tagS = el('precom-search-tag');
+    if (tagS) tagS.oninput = function (e) { state.qTag = e.target.value.trim().toUpperCase(); renderTagSearch(); };
     el('precom-pending-toggle').onchange = function (e) { state.onlyPending = e.target.checked; render(); };
     el('precom-export-btn').onclick = function () { exportData(false); };
     var allBtn = el('precom-export-all-btn');
     if (allBtn) allBtn.onclick = function () { exportData(true); };
     var clr = el('precom-clear-btn');
     if (clr) clr.onclick = function () {
-      state.system = '__ALL__'; state.q = ''; state.onlyPending = false;
+      state.system = '__ALL__'; state.q = ''; state.qTag = ''; state.onlyPending = false;
       state.sel = { type: 'all' }; state.kpiSel = null;
       el('precom-search').value = ''; el('precom-pending-toggle').checked = false;
+      var ts = el('precom-search-tag'); if (ts) ts.value = '';
       render(); buildSystemDD();
     };
     document.addEventListener('click', function () { var p = el('precom-dd-panel'); if (p) p.style.display = 'none'; });
@@ -402,12 +405,12 @@
 
     el('precom-body').innerHTML =
       '<div class="pcm-hint">Click ô discipline / tên subsystem / system / thẻ KPI → mở cửa sổ chi tiết toàn màn hình (có Export Excel) · Ô xanh = đạt DAC</div>' +
+      '<div id="precom-tagsearch" style="display:none;"></div>' +
       '<div class="table-container" style="flex:0 0 auto;min-height:120px;">' +
       '<table><thead>' + thead + '</thead><tbody>' +
       (html || '<tr><td colspan="' + nCols + '" class="text-center" style="padding:2rem;">Không có subsystem nào khớp bộ lọc.</td></tr>') +
       '</tbody></table></div>' +
-      '<div id="precom-detail" style="display:none;"></div>' +
-      '<div id="precom-chart-wrap"><canvas id="precom-chart"></canvas></div>';
+      '<div id="precom-detail" style="display:none;"></div>';
 
     // Click BAT KY thong tin tong hop nao -> mo modal full-screen chi tiet (yeu cau user)
     el('precom-body').querySelectorAll('td[data-ss][data-disc]').forEach(function (td) {
@@ -421,7 +424,7 @@
     });
 
     renderDetail();
-    renderChart();
+    renderTagSearch();
     // Auto-cuon detail vao tam nhin CHI khi user vua CLICK (refresh 3' KHONG cuon ->
     // fix bug "cuon xuong roi khong ve dau trang duoc").
     if (_click && (state.kpiSel || state.sel.type !== 'all')) {
@@ -769,11 +772,49 @@
     return out;
   }
 
-  function renderChart() {
-    var ctx = el('precom-chart');
-    if (!ctx) return;
-    if (_chart) { try { _chart.destroy(); } catch (e) {} _chart = null; }
-    _chart = drawSCurve(ctx, scopeWhere());
+  // Tim theo Tag No / Equipment No (tag_desc) — loc theo tung ky tu, hien bang preview rieng.
+  function renderTagSearch() {
+    var box = el('precom-tagsearch');
+    if (!box) return;
+    var q = state.qTag || '';
+    if (!q) { box.style.display = 'none'; box.innerHTML = ''; return; }
+    var like = '%' + q + '%';
+    var rows = window.PrecomDB.query(
+      "SELECT tag_no, MAX(tag_desc) tag_desc, subsystem, discipline," +
+      " COUNT(*) itot," +
+      " SUM(CASE WHEN complete_date IS NOT NULL AND TRIM(complete_date)<>'' THEN 1 ELSE 0 END) idone" +
+      " FROM itr_a" +
+      " WHERE UPPER(tag_no) LIKE ? OR UPPER(tag_desc) LIKE ?" +
+      " GROUP BY tag_no, subsystem, discipline" +
+      " ORDER BY (idone>=itot) , tag_no LIMIT 800",
+      [like, like]);
+    var head = '<tr><th>Tag No</th><th>Equipment / Description</th><th>Subsystem</th><th>Discipline</th>' +
+      '<th class="text-center">ITR-A</th><th class="text-center">Status</th></tr>';
+    var body = rows.map(function (r) {
+      var done = (r.idone || 0) >= (r.itot || 0) && (r.itot || 0) > 0;
+      var st = done ? '<span class="pcm-badge cssc">DONE</span>'
+        : '<span class="pcm-badge no">' + (r.idone || 0) + '/' + (r.itot || 0) + '</span>';
+      return '<tr class="pcm-tagrow" data-ss="' + esc(r.subsystem) + '" data-tag="' + esc(r.tag_no) + '" style="cursor:pointer;">' +
+        '<td style="font-weight:600;">' + esc(r.tag_no) + '</td>' +
+        '<td>' + esc(r.tag_desc || '') + '</td>' +
+        '<td>' + esc(ssShort(r.subsystem)) + '</td>' +
+        '<td>' + esc(r.discipline || '') + '</td>' +
+        '<td class="text-center">' + (r.idone || 0) + '/' + (r.itot || 0) + '</td>' +
+        '<td class="text-center">' + st + '</td></tr>';
+    }).join('');
+    box.style.display = 'block';
+    box.innerHTML =
+      '<div class="pcm-hint" style="color:#0ea5e9;">Kết quả tìm Tag / Equipment No: <b>' + rows.length +
+      '</b> tag khớp "<b>' + esc(q) + '</b>" · Click 1 dòng để mở chi tiết checksheet của tag đó.</div>' +
+      '<div class="table-container" style="flex:0 0 auto;max-height:300px;overflow:auto;border:1px solid rgba(56,189,248,0.3);border-radius:6px;">' +
+      '<table><thead>' + head + '</thead><tbody>' +
+      (body || '<tr><td colspan="6" class="text-center" style="padding:1.5rem;">Không có Tag/Equipment nào khớp.</td></tr>') +
+      '</tbody></table></div>';
+    box.querySelectorAll('tr.pcm-tagrow').forEach(function (tr) {
+      tr.onclick = function () {
+        openSubsystemWindow(tr.getAttribute('data-ss'), { tag: tr.getAttribute('data-tag') });
+      };
+    });
   }
   // S-curve tai-su-dung cho ca tab chinh lan modal. Tra ve Chart (hoac null).
   function drawSCurve(ctx, sc) {

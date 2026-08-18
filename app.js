@@ -2498,7 +2498,7 @@ function initTabs() {
     { btn: 'tab-database-view', container: 'database-view-container', name: 'database-view' },
     { btn: 'tab-testingdata-view', container: 'testingdata-view-container', name: 'testingdata-view' },
     { btn: 'tab-precom-view', container: 'precom-view-container', name: 'precom-view' },
-    { btn: 'tab-ai-view', container: 'ai-view-container', name: 'ai-view' }
+    { btn: 'tab-skyline-view', container: 'skyline-view-container', name: 'skyline-view' }
   ];
 
   tabs.forEach(tab => {
@@ -2537,6 +2537,10 @@ function initTabs() {
       if (tab.name === 'precom-view' && window.PrecomInit) {
         // Precom (ITR-A/Punch): DB thu 2 tai LAZY o lan mo dau tien (precom.js).
         window.PrecomInit();
+      }
+      if (tab.name === 'skyline-view' && window.SkylineInit) {
+        // Handover and Skyline: dung chung PrecomDB (ITR-A) + skyline-data.js. LAZY.
+        window.SkylineInit();
       }
       if (tab.name === 'testingdata-view') {
         // Embedded live Google Sheet -- lazy-load only when first opened (it's a
