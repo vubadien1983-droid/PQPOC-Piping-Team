@@ -25,42 +25,63 @@
 
   var CSS =
     '<style id="skyline-css">' +
-    '#skyline-body{font-size:0.78rem;}' +
-    '.sky-left{flex:0 0 300px;min-width:260px;overflow-y:auto;border-right:1px solid rgba(255,255,255,0.07);padding-right:6px;}' +
+    // ===== LIGHT THEME for the whole Handover tab (cool blue-tint, distinct from the app's dark tabs) =====
+    '#skyline-view-container{background:#e7eef7;}' +
+    '#skyline-view-container .dash-zone.card{background:#f4f8fc;color:#1f2d3d;border:1px solid #c9d6e6;}' +
+    '#skyline-view-container .dash-zone-header{border-bottom:1px solid #d3deea;}' +
+    '#skyline-view-container .dash-zone-header h2{color:#12324f;}' +
+    '#skyline-view-container .dash-zone-tag{background:#0ea5e9;color:#fff;}' +
+    '#skyline-view-container .no-selection-message{color:#33465b;}' +
+    '#skyline-view-container #skyline-meta{color:#5b6b7d;}' +
+    '#skyline-view-container #skyline-export-btn{background:#fff;color:#0369a1;border:1px solid #0ea5e9;}' +
+    '#skyline-body{font-size:0.78rem;color:#1f2d3d;}' +
+    '.sky-left{flex:0 0 300px;min-width:260px;overflow-y:auto;border-right:1px solid #d3deea;padding-right:6px;}' +
     '.sky-right{flex:1;min-width:0;overflow-y:auto;padding:0 4px 20px;}' +
-    '.sky-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:7px;cursor:pointer;margin-bottom:4px;border:1px solid transparent;background:rgba(255,255,255,0.02);}' +
-    '.sky-row:hover{background:rgba(56,189,248,0.08);}' +
-    '.sky-row.active{background:rgba(56,189,248,0.16);border-color:rgba(56,189,248,0.5);}' +
-    '.sky-row .nm{font-weight:600;}' +
-    '.sky-row .sub{font-size:0.66rem;color:var(--text-muted);}' +
+    '.sky-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:7px;cursor:pointer;margin-bottom:4px;border:1px solid #dbe4ee;background:#ffffff;}' +
+    '.sky-row:hover{background:#eaf4fd;border-color:#bcd9f0;}' +
+    '.sky-row.active{background:#dcecfb;border-color:#5aa9e6;}' +
+    '.sky-row .nm{font-weight:600;color:#1f2d3d;}' +
+    '.sky-row .sub{font-size:0.66rem;color:#6b7a8b;}' +
     '.sky-row .prog{font-size:0.72rem;font-weight:700;min-width:52px;text-align:right;}' +
-    '.sky-hi{color:#22c55e;}.sky-mid{color:#eab308;}.sky-lo{color:#f43f5e;}' +
+    '.sky-hi{color:#16a34a;}.sky-mid{color:#ca8a04;}.sky-lo{color:#dc2626;}' +
     '.sky-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:6px 0 12px;}' +
-    '.sky-kpi{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:10px 12px;cursor:pointer;transition:background .15s;}' +
-    '.sky-kpi:hover{background:rgba(56,189,248,0.10);border-color:rgba(56,189,248,0.4);}' +
-    '.sky-kpi .lab{font-size:0.64rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;}' +
-    '.sky-kpi .val{font-size:1.25rem;font-weight:800;margin-top:2px;}' +
-    '.sky-chartbox{position:relative;height:380px;background:#f7f9fb;border:1px solid #d3dae3;border-radius:8px;padding:6px;margin-bottom:14px;cursor:pointer;}' +
-    '.sky-sec-title{font-size:0.8rem;font-weight:700;margin:14px 0 6px;color:var(--text-main);border-left:3px solid #38bdf8;padding-left:8px;}' +
-    'table.sky-tbl{width:100%;border-collapse:collapse;font-size:0.72rem;margin-bottom:8px;}' +
-    'table.sky-tbl th,table.sky-tbl td{border:1px solid rgba(255,255,255,0.08);padding:4px 7px;text-align:center;}' +
-    'table.sky-tbl th{background:rgba(56,189,248,0.12);font-weight:700;}' +
+    '.sky-kpi{background:#ffffff;border:1px solid #dbe4ee;border-radius:8px;padding:10px 12px;cursor:pointer;transition:.15s;}' +
+    '.sky-kpi:hover{background:#eaf4fd;border-color:#8fc3ea;box-shadow:0 1px 4px rgba(14,165,233,0.18);}' +
+    '.sky-kpi .lab{font-size:0.64rem;color:#6b7a8b;text-transform:uppercase;letter-spacing:.4px;}' +
+    '.sky-kpi .val{font-size:1.25rem;font-weight:800;margin-top:2px;color:#12324f;}' +
+    '.sky-chartbox{position:relative;height:380px;background:#ffffff;border:1px solid #d3deea;border-radius:8px;padding:6px;margin-bottom:14px;cursor:pointer;}' +
+    '.sky-sec-title{font-size:0.8rem;font-weight:700;margin:14px 0 6px;color:#12324f;border-left:3px solid #0ea5e9;padding-left:8px;}' +
+    // panel summary tables (light)
+    'table.sky-tbl{width:100%;border-collapse:collapse;font-size:0.72rem;margin-bottom:8px;background:#fff;}' +
+    'table.sky-tbl th,table.sky-tbl td{border:1px solid #dbe4ee;padding:5px 8px;text-align:center;color:#1f2d3d;}' +
+    'table.sky-tbl th{background:#e8f1fb;font-weight:700;color:#12324f;}' +
     'table.sky-tbl td.l{text-align:left;font-weight:600;}' +
-    'table.sky-tbl tr.tot td{background:rgba(56,189,248,0.10);font-weight:800;}' +
-    'table.sky-tbl.clickable tbody tr{cursor:pointer;}table.sky-tbl.clickable tbody tr:hover td{background:rgba(56,189,248,0.12);}' +
+    'table.sky-tbl tr.tot td{background:#dcecfb;font-weight:800;}' +
+    'table.sky-tbl.clickable tbody tr{cursor:pointer;}table.sky-tbl.clickable tbody tr:hover td{background:#eaf4fd;}' +
     '.sky-clk{cursor:pointer;}' +
-    '.sky-var-pos{color:#22c55e;font-weight:800;}.sky-var-neg{color:#f43f5e;font-weight:800;}' +
-    '.sky-catA{background:rgba(34,197,94,0.10);}.sky-catB{background:rgba(234,179,8,0.10);}.sky-catC{background:rgba(244,63,94,0.10);}' +
-    '.sky-modal{position:fixed;inset:0;z-index:1400;background:rgba(6,12,22,0.72);display:none;}' +
+    '.sky-var-pos{color:#16a34a;font-weight:800;}.sky-var-neg{color:#dc2626;font-weight:800;}' +
+    '.sky-catA{background:rgba(22,163,74,0.09);}.sky-catB{background:rgba(202,138,4,0.11);}.sky-catC{background:rgba(220,38,38,0.09);}' +
+    // ===== Full-screen detail modal (light) =====
+    '.sky-modal{position:fixed;inset:0;z-index:1400;background:rgba(15,32,55,0.35);display:none;}' +
     '.sky-modal.open{display:flex;}' +
-    '.sky-win{position:absolute;inset:0;width:100vw;height:100vh;background:var(--bg-main,#0f172a);display:flex;flex-direction:column;}' +
-    '.sky-win-head{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.03);}' +
-    '.sky-win-head h3{margin:0;font-size:0.95rem;flex:1;}' +
-    '.sky-win-body{flex:1;min-height:0;overflow:auto;padding:12px 16px;}' +
-    '.sky-x{cursor:pointer;font-size:1.4rem;line-height:1;background:none;border:none;color:var(--text-muted);padding:0 6px;}' +
-    '.sky-x:hover{color:#f43f5e;}' +
-    '.sky-badge-done{background:rgba(34,197,94,0.18);color:#22c55e;padding:1px 7px;border-radius:10px;font-size:0.66rem;font-weight:700;}' +
-    '.sky-badge-open{background:rgba(148,163,184,0.18);color:#94a3b8;padding:1px 7px;border-radius:10px;font-size:0.66rem;font-weight:700;}' +
+    '.sky-win{position:absolute;inset:0;width:100vw;height:100vh;background:#eef3f9;display:flex;flex-direction:column;}' +
+    '.sky-win-head{display:flex;align-items:center;gap:10px;padding:11px 18px;border-bottom:2px solid #0ea5e9;background:#f8fbff;box-shadow:0 1px 3px rgba(15,32,55,0.08);}' +
+    '.sky-win-head h3{margin:0;font-size:0.98rem;font-weight:700;flex:1;color:#12324f;}' +
+    '.sky-win-head .btn-secondary{background:#fff;color:#0369a1;border:1px solid #0ea5e9;}' +
+    '.sky-win-body{flex:1;min-height:0;overflow:auto;padding:0;background:#eef3f9;}' +
+    '.sky-rt-note{padding:9px 16px;color:#5b6b7d;font-size:0.72rem;font-weight:600;}' +
+    '.sky-x{cursor:pointer;font-size:1.5rem;line-height:1;background:none;border:none;color:#64748b;padding:0 6px;}' +
+    '.sky-x:hover{color:#dc2626;}' +
+    '.sky-badge-done{background:#dcfce7;color:#15803d;padding:1px 8px;border-radius:10px;font-size:0.66rem;font-weight:700;}' +
+    '.sky-badge-open{background:#eef2f7;color:#64748b;padding:1px 8px;border-radius:10px;font-size:0.66rem;font-weight:700;}' +
+    // ===== Report table with FROZEN (sticky) header =====
+    '.sky-rtbl{width:100%;border-collapse:separate;border-spacing:0;font-size:0.72rem;background:#fff;}' +
+    '.sky-rtbl thead th{position:sticky;top:0;z-index:2;background:#12324f;color:#fff;white-space:nowrap;padding:9px 11px;border-right:1px solid #24425f;border-bottom:2px solid #0ea5e9;text-align:center;font-weight:700;text-transform:uppercase;font-size:0.66rem;letter-spacing:.3px;}' +
+    '.sky-rtbl tbody td{padding:6px 11px;border-bottom:1px solid #e4eaf1;border-right:1px solid #eef2f7;color:#22303f;vertical-align:top;text-align:center;white-space:nowrap;}' +
+    '.sky-rtbl tbody tr:nth-child(even){background:#f6f9fc;}' +
+    '.sky-rtbl tbody tr:hover{background:#eaf4fd;}' +
+    '.sky-rtbl td.l{text-align:left;white-space:normal;min-width:280px;}' +
+    '.sky-rtbl td.mono{font-family:ui-monospace,Consolas,monospace;font-weight:600;}' +
     '</style>';
 
   function clsProg(p) { return p >= 75 ? 'sky-hi' : p >= 40 ? 'sky-mid' : 'sky-lo'; }
@@ -230,8 +251,8 @@
     el('sky-modal').classList.add('open');
   }
   function bigTable(head, rows, note) {
-    return (note ? '<div style="margin-bottom:6px;color:var(--text-muted);font-size:0.72rem;">' + note + '</div>' : '') +
-      '<table class="sky-tbl"><thead><tr>' + head.map(function (h) { return '<th>' + esc(h) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+    return (note ? '<div class="sky-rt-note">' + esc(note) + '</div>' : '') +
+      '<table class="sky-rtbl"><thead><tr>' + head.map(function (h) { return '<th>' + esc(h) + '</th>'; }).join('') + '</tr></thead><tbody>' +
       rows + '</tbody></table>';
   }
 
@@ -250,7 +271,7 @@
     var body = rows.map(function (r) {
       var done = r.complete_date && String(r.complete_date).trim();
       exp.push([r.tag_no, r.subsystem, r.discipline, r.cs_type, r.plan_finish || '', r.complete_date || '', done ? 'Complete' : 'Open']);
-      return '<tr><td>' + esc(r.tag_no) + '</td><td>' + esc(r.subsystem) + '</td><td>' + esc(r.discipline) + '</td><td>' + esc(r.cs_type || '') +
+      return '<tr><td class="mono">' + esc(r.tag_no) + '</td><td class="mono">' + esc(r.subsystem) + '</td><td>' + esc(r.discipline) + '</td><td>' + esc(r.cs_type || '') +
         '</td><td>' + esc(r.plan_finish || '') + '</td><td>' + esc(r.complete_date || '') + '</td><td>' +
         (done ? '<span class="sky-badge-done">Complete</span>' : '<span class="sky-badge-open">Open</span>') + '</td></tr>';
     }).join('');
@@ -264,8 +285,8 @@
     var exp = [['Punch No', 'Category', 'Status', 'Discipline', 'Tag No', 'Subsystem', 'Description']];
     var body = rows.map(function (r) {
       exp.push([r.punch_no, r.category, r.status, r.discipline, r.tag_no, r.subsystem, r.description]);
-      return '<tr><td>' + esc(r.punch_no) + '</td><td>' + esc(r.category) + '</td><td>' + esc(r.status || '') + '</td><td>' + esc(r.discipline || '') +
-        '</td><td>' + esc(r.tag_no || '') + '</td><td>' + esc(r.subsystem || '') + '</td><td class="l" style="text-align:left;">' + esc(r.description || '') + '</td></tr>';
+      return '<tr><td class="mono">' + esc(r.punch_no) + '</td><td>' + esc(r.category) + '</td><td>' + esc(r.status || '') + '</td><td>' + esc(r.discipline || '') +
+        '</td><td class="mono">' + esc(r.tag_no || '') + '</td><td class="mono">' + esc(r.subsystem || '') + '</td><td class="l">' + esc(r.description || '') + '</td></tr>';
     }).join('');
     var note = rows.length + ' punch item(s)' + (rows.length >= LIMIT ? ' (showing first ' + LIMIT + ')' : '');
     openModal('Punchlist Detail — ' + label, bigTable(['Punch No', 'Category', 'Status', 'Discipline', 'Tag No', 'Subsystem', 'Description'], body, note), exp, 'Punch_' + label);
@@ -278,7 +299,7 @@
     var body = rows.map(function (r) {
       var p = pct(r.itr_done, r.itr_total);
       exp.push([r.subsystem, r.subsystem_desc, r.itr_total, r.itr_done, f1(p), r.punch_open]);
-      return '<tr><td>' + esc(r.subsystem) + '</td><td class="l" style="text-align:left;">' + esc(r.subsystem_desc || '') + '</td><td>' + r.itr_total +
+      return '<tr><td class="mono">' + esc(r.subsystem) + '</td><td class="l">' + esc(r.subsystem_desc || '') + '</td><td>' + r.itr_total +
         '</td><td>' + r.itr_done + '</td><td class="' + clsProg(p) + '">' + f1(p) + '%</td><td>' + r.punch_open + '</td></tr>';
     }).join('');
     openModal('Subsystem Breakdown — ' + discLabel(disc), bigTable(['Subsystem', 'Description', 'ITR Total', 'ITR Done', '% Done', 'Punch Open'], body, rows.length + ' subsystem(s)'), exp, 'Subsystems_' + disc);
