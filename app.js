@@ -543,8 +543,12 @@ function isHydroReady(p) {
 // the table's Hydrotest Status column, the row colour AND the sort order all use,
 // so the chart and the table can never disagree again.
 function getPackageStatus(p) {
-  if (p.reinstStatus === "Done") return "reinst";   // reinstated (workflow complete)
-  if (p.hydroStatus  === "Done") return "done";     // Sheet col Z has a hydro date
+  // Reinstatement is a POST-hydrotest activity: a reinstated package HAS completed
+  // hydrotest. So "Done Hydrotest" must include reinstated packages -> the donut's
+  // "Done Hydrotest" ratio now matches the SYSTEM SUMMARY Hydrotest % (375/922).
+  // Reinstatement remains tracked separately (SYSTEM SUMMARY "Reinstatement" row +
+  // the Reinstatement badge column in the detailed table), so no info is lost.
+  if (p.hydroStatus  === "Done") return "done";     // Sheet col Z has a hydro date (reinstated pkgs have this too -> counted here)
   if (isHydroReady(p))           return "ready";    // welding 100% + all NDT cleared
   if ((p.weldingDoneCount || 0) > 0 || (p.ndtDoneCount || 0) > 0) return "progress";
   return "pending";
