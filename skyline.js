@@ -107,12 +107,14 @@
     function cumUpto(byDay, day) { var s = 0; for (var k in byDay) { if (k <= day) s += byDay[k]; } return s; }
 
     var days = [], planDay = [], actDay = [], planCum = [], actCum = [];
-    var periodPlan = 0, periodAct = 0;
+    // Chart spans 2 weeks; the KPI summary "period" only reflects the LAST 1 WEEK (7 days).
+    var periodPlan = 0, periodAct = 0, planWk1 = 0, actWk1 = 0;
     for (var i = 0; i < WINDOW_DAYS; i++) {
       var d = shiftISO(start, i);
       var pd = planByDay[d] || 0, ad = actByDay[d] || 0;
       days.push(d); planDay.push(pd); actDay.push(ad);
       periodPlan += pd; periodAct += ad;
+      if (i >= WINDOW_DAYS - 7) { planWk1 += pd; actWk1 += ad; } // last 7 days only
       planCum.push(pct(cumUpto(planByDay, d), denom));
       actCum.push(pct(cumUpto(actByDay, d), denom));
     }
@@ -120,6 +122,7 @@
       days: days, planDay: planDay, actDay: actDay, planCum: planCum, actCum: actCum,
       totals: tot, end: end, denom: denom,
       periodPlan: periodPlan, periodAct: periodAct,
+      planWk1: planWk1, actWk1: actWk1, wk1Start: shiftISO(start, WINDOW_DAYS - 7),
       planCumEnd: pct(cumUpto(planByDay, end), denom), actCumEnd: pct(cumUpto(actByDay, end), denom)
     };
   }
@@ -157,12 +160,13 @@
   function kpiTable(cur) {
     var denom = cur.denom;
     var vr = cur.actCumEnd - cur.planCumEnd;
-    return '<table class="sky-tbl"><thead><tr><th class="l">Metric (cumulative to date · ' + esc(fmtDay(cur.end)) + ')</th><th>Value</th></tr></thead><tbody>' +
-      '<tr><td class="l">1. KPI PLAN (last 2 weeks)</td><td>' + f1(pct(cur.periodPlan, denom)) + '%</td></tr>' +
-      '<tr><td class="l">2. KPI PLAN CUM</td><td>' + f1(cur.planCumEnd) + '%</td></tr>' +
-      '<tr><td class="l">3. ACTUAL (last 2 weeks)</td><td>' + f1(pct(cur.periodAct, denom)) + '%</td></tr>' +
-      '<tr><td class="l">4. ACTUAL CUM</td><td>' + f1(cur.actCumEnd) + '%</td></tr>' +
-      '<tr class="tot"><td class="l">VAR (Actual − Plan)</td><td class="' + (vr >= 0 ? 'sky-var-pos' : 'sky-var-neg') + '">' + (vr >= 0 ? '+' : '') + f1(vr) + '%</td></tr>' +
+    var wk = esc(fmtDay(cur.wk1Start)) + ' → ' + esc(fmtDay(cur.end));
+    return '<table class="sky-tbl"><thead><tr><th class="l">Metric</th><th>Value</th></tr></thead><tbody>' +
+      '<tr><td class="l">1. KPI PLAN (this week · ' + wk + ')</td><td>' + f1(pct(cur.planWk1, denom)) + '% (' + cur.planWk1 + ')</td></tr>' +
+      '<tr><td class="l">2. KPI PLAN CUM (to date)</td><td>' + f1(cur.planCumEnd) + '%</td></tr>' +
+      '<tr><td class="l">3. ACTUAL (this week · ' + wk + ')</td><td>' + f1(pct(cur.actWk1, denom)) + '% (' + cur.actWk1 + ')</td></tr>' +
+      '<tr><td class="l">4. ACTUAL CUM (to date)</td><td>' + f1(cur.actCumEnd) + '%</td></tr>' +
+      '<tr class="tot"><td class="l">VAR (Actual − Plan, cum)</td><td class="' + (vr >= 0 ? 'sky-var-pos' : 'sky-var-neg') + '">' + (vr >= 0 ? '+' : '') + f1(vr) + '%</td></tr>' +
       '</tbody></table>';
   }
 
