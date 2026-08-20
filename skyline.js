@@ -84,6 +84,13 @@
     '.sky-rtbl td.mono{font-family:ui-monospace,Consolas,monospace;font-weight:600;}' +
     '.sky-rtbl tbody tr.sky-rrow{cursor:pointer;}' +
     '.sky-rtbl tbody tr.sky-rrow:hover{background:#dcecfb;}' +
+    // header summary strip (Actual vs Skyline plan)
+    '.sky-sumwrap{padding:10px 16px 4px;}' +
+    '.sky-sum{border-collapse:collapse;font-size:0.72rem;background:#fff;box-shadow:0 1px 3px rgba(15,32,55,0.07);}' +
+    '.sky-sum th,.sky-sum td{border:1px solid #dbe4ee;padding:5px 13px;text-align:center;white-space:nowrap;color:#22303f;}' +
+    '.sky-sum th{background:#12324f;color:#fff;text-transform:uppercase;font-size:0.61rem;letter-spacing:.3px;}' +
+    '.sky-sum td.l{text-align:left;font-weight:700;color:#12324f;}' +
+    '.sky-sum .aC{color:#16a34a;font-weight:700;}.sky-sum .aO{color:#dc2626;font-weight:700;}.sky-sum .plan{color:#0369a1;font-weight:700;}' +
     // level-2 detail modal (stacks above level-1)
     '.sky-modal2{position:fixed;inset:0;z-index:1500;background:rgba(15,32,55,0.42);display:none;}' +
     '.sky-modal2.open{display:flex;}' +
@@ -147,7 +154,7 @@
     }
     return {
       days: days, planDay: planDay, actDay: actDay, planCum: planCum, actCum: actCum,
-      totals: tot, end: end, denom: denom,
+      totals: tot, end: end, denom: denom, disc: disc || null,
       periodPlan: periodPlan, periodAct: periodAct,
       planWk1: planWk1, actWk1: actWk1, wk1Start: shiftISO(start, WINDOW_DAYS - 7),
       planCumEnd: pct(cumUpto(planByDay, end), denom), actCumEnd: pct(cumUpto(actByDay, end), denom)
@@ -267,6 +274,51 @@
   }
 
   var LIMIT = 6000;
+
+  function fmtDMY(iso) { var p = iso.split('-'); if (p.length !== 3) return iso; return p[2] + '-' + MO[(+p[1]) - 1] + '-' + p[0].slice(2); }
+
+  // Aggregate ITR / Punch / DAC for a scope (Actual + Skyline plan). DAC = 100% ITR-A done + Punch A closed.
+  function scopeSummary(disc, ss) {
+    var w = ' WHERE 1=1', params = [];
+    if (disc) w += " AND UPPER(discipline)='" + disc.replace(/'/g, "''") + "'";
+    if (ss) { w += ' AND subsystem=?'; params.push(ss); }
+    var rows = window.PrecomDB.query(
+      "SELECT subsystem, discipline, itr_total, itr_done, COALESCE(punch_a_total,0) pat, COALESCE(punch_a_open,0) pao," +
+      " COALESCE(punch_b_total,0) pbt, COALESCE(punch_b_open,0) pbo, COALESCE(punch_c_total,0) pct, COALESCE(punch_c_open,0) pco" +
+      " FROM precom_summary" + w, params);
+    var plan = (window.DAC_SKYLINE && window.DAC_SKYLINE.plan) || [];
+    var planMap = {}; plan.forEach(function (p) { if (p.dac) planMap[p.ss + '|' + p.disc] = p.dac; });
+    var today = todayISO();
+    var s = { units: 0, itrT: 0, itrD: 0, punT: 0, punO: 0, dacAch: 0, dacPlanTot: 0, dacPlanDue: 0, itrPlanDue: 0, dates: [] };
+    rows.forEach(function (r) {
+      s.units++; s.itrT += r.itr_total || 0; s.itrD += r.itr_done || 0;
+      s.punT += r.pat + r.pbt + r.pct; s.punO += r.pao + r.pbo + r.pco;
+      if (r.itr_total > 0 && r.itr_done >= r.itr_total && r.pao === 0) s.dacAch++;   // DAC achieved (actual)
+      var pdac = planMap[r.subsystem + '|' + r.discipline];
+      if (pdac) { s.dacPlanTot++; s.dates.push(pdac); if (pdac <= today) { s.dacPlanDue++; s.itrPlanDue += r.itr_total || 0; } }
+    });
+    s.itrO = s.itrT - s.itrD; s.punC = s.punT - s.punO; s.dacOpen = s.units - s.dacAch; s.dates.sort();
+    return s;
+  }
+
+  // Header summary card: ITR / Punch / DAC — Total · Closed · Open · Actual% · Skyline plan (to-date)
+  function summaryHtml(disc, ss) {
+    var s = scopeSummary(disc, ss);
+    var dacPlan;
+    if (ss) dacPlan = s.dates.length ? (esc(fmtDMY(s.dates[0])) + (s.dacPlanDue ? ' · due' : ' · upcoming')) : '—';
+    else dacPlan = s.dates.length ? (s.dacPlanDue + '/' + s.dacPlanTot + ' due · ' + esc(fmtDMY(s.dates[0])) + '→' + esc(fmtDMY(s.dates[s.dates.length - 1]))) : '—';
+    function r(item, tot, closed, open, planTxt) {
+      return '<tr><td class="l">' + item + '</td><td>' + tot + '</td><td class="aC">' + closed + '</td><td class="aO">' + open +
+        '</td><td>' + f1(pct(closed, tot)) + '%</td><td class="plan">' + planTxt + '</td></tr>';
+    }
+    return '<div class="sky-sumwrap"><table class="sky-sum">' +
+      '<thead><tr><th>Item</th><th>Total</th><th>Closed</th><th>Open</th><th>Actual %</th><th>Skyline Plan (≤ today)</th></tr></thead><tbody>' +
+      r('ITR-A', s.itrT, s.itrD, s.itrO, s.dates.length ? (s.itrPlanDue + ' due') : '—') +
+      r('Punch A/B/C', s.punT, s.punC, s.punO, '—') +
+      r('DAC (subsys×disc)', s.units, s.dacAch, s.dacOpen, dacPlan) +
+      '</tbody></table></div>';
+  }
+
   function itrDetailRows(disc, filter) {
     var w = discWhere(disc);
     if (filter === 'done') w += " AND complete_date IS NOT NULL AND TRIM(complete_date)<>''";
@@ -286,7 +338,7 @@
         (done ? '<span class="sky-badge-done">Complete</span>' : '<span class="sky-badge-open">Open</span>') + '</td></tr>';
     }).join('');
     var note = rows.length + ' ITR-A checksheet(s)' + (rows.length >= LIMIT ? ' (showing first ' + LIMIT + ')' : '');
-    openModal('ITR-A Detail — ' + label, bigTable(['Tag No', 'Subsystem', 'Discipline', 'CS Type', 'Plan Finish', 'Complete Date', 'Status'], body, note), exp, 'ITR-A_' + label);
+    openModal('ITR-A Detail — ' + label, summaryHtml(disc, null) + bigTable(['Tag No', 'Subsystem', 'Discipline', 'CS Type', 'Plan Finish', 'Complete Date', 'Status'], body, note), exp, 'ITR-A_' + label);
   }
   function openPunchModal(disc, label) {
     var rows = window.PrecomDB.query(
@@ -299,7 +351,7 @@
         '</td><td class="mono">' + esc(r.tag_no || '') + '</td><td class="mono">' + esc(r.subsystem || '') + '</td><td class="l">' + esc(r.description || '') + '</td></tr>';
     }).join('');
     var note = rows.length + ' punch item(s)' + (rows.length >= LIMIT ? ' (showing first ' + LIMIT + ')' : '');
-    openModal('Punchlist Detail — ' + label, bigTable(['Punch No', 'Category', 'Status', 'Discipline', 'Tag No', 'Subsystem', 'Description'], body, note), exp, 'Punch_' + label);
+    openModal('Punchlist Detail — ' + label, summaryHtml(disc, null) + bigTable(['Punch No', 'Category', 'Status', 'Discipline', 'Tag No', 'Subsystem', 'Description'], body, note), exp, 'Punch_' + label);
   }
   function openSubsysModal(disc) {
     var rows = window.PrecomDB.query(
@@ -312,7 +364,7 @@
       return '<tr class="sky-rrow" data-ss="' + esc(r.subsystem) + '"><td class="mono">' + esc(r.subsystem) + '</td><td class="l">' + esc(r.subsystem_desc || '') + '</td><td>' + r.itr_total +
         '</td><td>' + r.itr_done + '</td><td class="' + clsProg(p) + '">' + f1(p) + '%</td><td>' + r.punch_open + '</td></tr>';
     }).join('');
-    openModal('Subsystem Breakdown — ' + discLabel(disc), bigTable(['Subsystem', 'Description', 'ITR Total', 'ITR Done', '% Done', 'Punch Open'], body, rows.length + ' subsystem(s) · click a row for ITR-A & Punch detail'), exp, 'Subsystems_' + disc);
+    openModal('Subsystem Breakdown — ' + discLabel(disc), summaryHtml(disc, null) + bigTable(['Subsystem', 'Description', 'ITR Total', 'ITR Done', '% Done', 'Punch Open'], body, rows.length + ' subsystem(s) · click a row for ITR-A & Punch detail'), exp, 'Subsystems_' + disc);
     // Detail-2: click a subsystem row -> ITR-A + Punch of that subsystem (× discipline)
     el('sky-modal-body').querySelectorAll('tr.sky-rrow').forEach(function (tr) {
       tr.onclick = function () { openSubsysDetail(tr.getAttribute('data-ss'), disc); };
@@ -324,7 +376,7 @@
       exp.push([d, cur.planDay[i], cur.actDay[i], f1(cur.planCum[i]), f1(cur.actCum[i])]);
       return '<tr><td>' + esc(fmtDay(d)) + '</td><td>' + cur.planDay[i] + '</td><td>' + cur.actDay[i] + '</td><td>' + f1(cur.planCum[i]) + '%</td><td>' + f1(cur.actCum[i]) + '%</td></tr>';
     }).join('');
-    openModal('S-Curve Daily Data — ' + label, bigTable(['Day', 'KPI Plan', 'Actual', 'KPI Plan Cum %', 'Actual Cum %'], body, 'Last 2 weeks · daily'), exp, 'SCurve_' + label);
+    openModal('S-Curve Daily Data — ' + label, summaryHtml(cur.disc, null) + bigTable(['Day', 'KPI Plan', 'Actual', 'KPI Plan Cum %', 'Actual Cum %'], body, 'Last 2 weeks · daily'), exp, 'SCurve_' + label);
   }
 
   function exportTable(rows, name) { exportSheets([{ name: name, rows: rows }], name); }
@@ -394,8 +446,7 @@
     }).join('');
 
     var html =
-      '<div class="sky-rt-note">Subsystem <b>' + esc(ss) + '</b> · ' + esc(discLabel(disc)) +
-      ' — ITR-A ' + itrDone + '/' + itr.length + ' done · Punch ' + punOpen + ' open</div>' +
+      summaryHtml(disc, ss) +
       '<div class="sky-sec-title" style="margin:6px 16px 4px;">ITR-A Checksheets (' + itr.length + ')</div>' +
       bigTable(['Tag No', 'Description', 'CS Type', 'Plan Finish', 'Complete Date', 'Status'], itrBody ||
         '<tr><td colspan="6" style="text-align:center;padding:14px;">No ITR-A.</td></tr>', null) +
