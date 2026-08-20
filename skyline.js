@@ -82,6 +82,12 @@
     '.sky-rtbl tbody tr:hover{background:#eaf4fd;}' +
     '.sky-rtbl td.l{text-align:left;white-space:normal;min-width:280px;}' +
     '.sky-rtbl td.mono{font-family:ui-monospace,Consolas,monospace;font-weight:600;}' +
+    '.sky-rtbl tbody tr.sky-rrow{cursor:pointer;}' +
+    '.sky-rtbl tbody tr.sky-rrow:hover{background:#dcecfb;}' +
+    // level-2 detail modal (stacks above level-1)
+    '.sky-modal2{position:fixed;inset:0;z-index:1500;background:rgba(15,32,55,0.42);display:none;}' +
+    '.sky-modal2.open{display:flex;}' +
+    '.sky-drillhint{font-size:0.66rem;color:#0369a1;font-weight:600;margin-left:6px;}' +
     '</style>';
 
   function clsProg(p) { return p >= 75 ? 'sky-hi' : p >= 40 ? 'sky-mid' : 'sky-lo'; }
@@ -237,7 +243,11 @@
     document.body.appendChild(d);
     el('sky-modal-x').onclick = closeModal;
     d.addEventListener('click', function (e) { if (e.target === d) closeModal(); });
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape') return;
+      if (el('sky-modal2') && el('sky-modal2').classList.contains('open')) closeModal2();
+      else closeModal();
+    });
   }
   function closeModal() { var m = el('sky-modal'); if (m) m.classList.remove('open'); }
   function openModal(title, html, exportRows, exportName) {
@@ -299,10 +309,14 @@
     var body = rows.map(function (r) {
       var p = pct(r.itr_done, r.itr_total);
       exp.push([r.subsystem, r.subsystem_desc, r.itr_total, r.itr_done, f1(p), r.punch_open]);
-      return '<tr><td class="mono">' + esc(r.subsystem) + '</td><td class="l">' + esc(r.subsystem_desc || '') + '</td><td>' + r.itr_total +
+      return '<tr class="sky-rrow" data-ss="' + esc(r.subsystem) + '"><td class="mono">' + esc(r.subsystem) + '</td><td class="l">' + esc(r.subsystem_desc || '') + '</td><td>' + r.itr_total +
         '</td><td>' + r.itr_done + '</td><td class="' + clsProg(p) + '">' + f1(p) + '%</td><td>' + r.punch_open + '</td></tr>';
     }).join('');
-    openModal('Subsystem Breakdown — ' + discLabel(disc), bigTable(['Subsystem', 'Description', 'ITR Total', 'ITR Done', '% Done', 'Punch Open'], body, rows.length + ' subsystem(s)'), exp, 'Subsystems_' + disc);
+    openModal('Subsystem Breakdown — ' + discLabel(disc), bigTable(['Subsystem', 'Description', 'ITR Total', 'ITR Done', '% Done', 'Punch Open'], body, rows.length + ' subsystem(s) · click a row for ITR-A & Punch detail'), exp, 'Subsystems_' + disc);
+    // Detail-2: click a subsystem row -> ITR-A + Punch of that subsystem (× discipline)
+    el('sky-modal-body').querySelectorAll('tr.sky-rrow').forEach(function (tr) {
+      tr.onclick = function () { openSubsysDetail(tr.getAttribute('data-ss'), disc); };
+    });
   }
   function openDailyModal(cur, label) {
     var exp = [['Day', 'KPI Plan', 'Actual', 'KPI Plan Cum %', 'Actual Cum %']];
@@ -313,15 +327,83 @@
     openModal('S-Curve Daily Data — ' + label, bigTable(['Day', 'KPI Plan', 'Actual', 'KPI Plan Cum %', 'Actual Cum %'], body, 'Last 2 weeks · daily'), exp, 'SCurve_' + label);
   }
 
-  function exportTable(rows, name) {
+  function exportTable(rows, name) { exportSheets([{ name: name, rows: rows }], name); }
+  function exportSheets(sheets, name) {
     if (typeof ExcelJS === 'undefined') { alert('ExcelJS is still loading, please retry in a moment.'); return; }
-    var wb = new ExcelJS.Workbook(); var ws = wb.addWorksheet(name.slice(0, 28));
-    rows.forEach(function (r) { ws.addRow(r); });
-    ws.getRow(1).font = { bold: true };
+    var wb = new ExcelJS.Workbook();
+    sheets.forEach(function (s) {
+      var ws = wb.addWorksheet((s.name || 'Sheet').slice(0, 28).replace(/[\\/*?:\[\]]/g, ' '));
+      s.rows.forEach(function (r) { ws.addRow(r); });
+      if (ws.rowCount) ws.getRow(1).font = { bold: true };
+    });
     wb.xlsx.writeBuffer().then(function (buf) {
       var a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
       a.download = name + '.xlsx'; a.click();
+    });
+  }
+
+  // ===== LEVEL-2 detail modal (stacks above level-1) =====
+  function ensureModal2() {
+    if (el('sky-modal2')) return;
+    var d = document.createElement('div');
+    d.id = 'sky-modal2'; d.className = 'sky-modal2';
+    d.innerHTML = '<div class="sky-win"><div class="sky-win-head"><h3 id="sky-m2-title"></h3>' +
+      '<button class="btn btn-secondary" id="sky-m2-export" style="padding:0.3rem 0.6rem;font-size:0.7rem;min-height:auto;">Export</button>' +
+      '<button class="sky-x" id="sky-m2-x" title="Back">&times;</button></div>' +
+      '<div class="sky-win-body" id="sky-m2-body"></div></div>';
+    document.body.appendChild(d);
+    el('sky-m2-x').onclick = closeModal2;
+    d.addEventListener('click', function (e) { if (e.target === d) closeModal2(); });
+  }
+  function closeModal2() { var m = el('sky-modal2'); if (m) m.classList.remove('open'); }
+  function openModal2(title, html, onExport) {
+    ensureModal2();
+    el('sky-m2-title').textContent = title;
+    el('sky-m2-body').innerHTML = html;
+    var xb = el('sky-m2-export');
+    if (onExport) { xb.style.display = ''; xb.onclick = onExport; } else { xb.style.display = 'none'; }
+    el('sky-modal2').classList.add('open');
+  }
+
+  // Detail-2: ITR-A checksheets + Punch list for one subsystem × discipline (like precom's openSubsystemWindow)
+  function openSubsysDetail(ss, disc) {
+    var dw = discWhere(disc);
+    var itr = window.PrecomDB.query(
+      "SELECT tag_no, tag_desc, cs_type, plan_finish, complete_date FROM itr_a" +
+      " WHERE subsystem=?" + dw + " ORDER BY (complete_date IS NOT NULL AND TRIM(complete_date)<>''), tag_no LIMIT " + LIMIT, [ss]);
+    var pun = window.PrecomDB.query(
+      "SELECT punch_no, category, status, tag_no, description FROM punch_list" +
+      " WHERE subsystem=?" + dw + " ORDER BY category, (UPPER(TRIM(status))='CLOSED'), punch_no LIMIT " + LIMIT, [ss]);
+    var itrDone = itr.filter(function (r) { return r.complete_date && String(r.complete_date).trim(); }).length;
+    var punOpen = pun.filter(function (r) { return String(r.status || '').toUpperCase().trim() !== 'CLOSED'; }).length;
+
+    var itrExp = [['Tag No', 'Description', 'CS Type', 'Plan Finish', 'Complete Date', 'Status']];
+    var itrBody = itr.map(function (r) {
+      var done = r.complete_date && String(r.complete_date).trim();
+      itrExp.push([r.tag_no, r.tag_desc, r.cs_type, r.plan_finish || '', r.complete_date || '', done ? 'Complete' : 'Open']);
+      return '<tr><td class="mono">' + esc(r.tag_no) + '</td><td class="l">' + esc(r.tag_desc || '') + '</td><td>' + esc(r.cs_type || '') +
+        '</td><td>' + esc(r.plan_finish || '') + '</td><td>' + esc(r.complete_date || '') + '</td><td>' +
+        (done ? '<span class="sky-badge-done">Complete</span>' : '<span class="sky-badge-open">Open</span>') + '</td></tr>';
+    }).join('');
+    var punExp = [['Punch No', 'Category', 'Status', 'Tag No', 'Description']];
+    var punBody = pun.map(function (r) {
+      punExp.push([r.punch_no, r.category, r.status, r.tag_no, r.description]);
+      return '<tr><td class="mono">' + esc(r.punch_no) + '</td><td>' + esc(r.category) + '</td><td>' + esc(r.status || '') +
+        '</td><td class="mono">' + esc(r.tag_no || '') + '</td><td class="l">' + esc(r.description || '') + '</td></tr>';
+    }).join('');
+
+    var html =
+      '<div class="sky-rt-note">Subsystem <b>' + esc(ss) + '</b> · ' + esc(discLabel(disc)) +
+      ' — ITR-A ' + itrDone + '/' + itr.length + ' done · Punch ' + punOpen + ' open</div>' +
+      '<div class="sky-sec-title" style="margin:6px 16px 4px;">ITR-A Checksheets (' + itr.length + ')</div>' +
+      bigTable(['Tag No', 'Description', 'CS Type', 'Plan Finish', 'Complete Date', 'Status'], itrBody ||
+        '<tr><td colspan="6" style="text-align:center;padding:14px;">No ITR-A.</td></tr>', null) +
+      '<div class="sky-sec-title" style="margin:16px 16px 4px;">Punch List (' + pun.length + ')</div>' +
+      bigTable(['Punch No', 'Category', 'Status', 'Tag No', 'Description'], punBody ||
+        '<tr><td colspan="5" style="text-align:center;padding:14px;">No punch.</td></tr>', null);
+    openModal2(ss + ' · ' + discLabel(disc), html, function () {
+      exportSheets([{ name: 'ITR-A', rows: itrExp }, { name: 'Punch', rows: punExp }], 'Detail_' + ss + '_' + disc);
     });
   }
 
