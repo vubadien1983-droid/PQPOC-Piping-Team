@@ -21,7 +21,9 @@
 
   function el(id) { return document.getElementById(id); }
   function esc(v) { return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
-  function pct(d, t) { return t > 0 ? Math.round(d * 100 / t) : 0; }
+  // Progress % giu 1 chu so thap phan (dong bo voi tab Handover, khong lam tron 3.9 -> 4).
+  // Tra ve chuoi da format ('3.9'); pctCls so sanh nguong tu ep kieu chuoi->so.
+  function pct(d, t) { return t > 0 ? (Math.round(d * 1000 / t) / 10).toFixed(1) : '0.0'; }
   function pctCls(p) { return p >= 80 ? 'pcm-hi' : (p >= 40 ? 'pcm-mid' : 'pcm-lo'); }
   // Chon cot AN TOAN: cot KHONG co trong bang -> 'NULL AS <cot>' de tranh loi SQL "no such column"
   // khi nguon doi/bo cot (vd ITR-A moi bo PlanStart) -> detail/detail-2 khong bi vo.
@@ -236,7 +238,7 @@
   function systemStats() {
     return window.PrecomDB.query(
       "SELECT system_no, COUNT(*) tot, SUM(cssc) cssc FROM (" +
-      " SELECT system_no, subsystem, CASE WHEN SUM(CASE WHEN itr_done>=itr_total AND COALESCE(punch_a_open,0)=0 THEN 1 ELSE 0 END)=COUNT(*) THEN 1 ELSE 0 END cssc" +
+      " SELECT system_no, subsystem, CASE WHEN SUM(CASE WHEN itr_total>0 AND itr_done>=itr_total AND COALESCE(punch_a_open,0)=0 THEN 1 ELSE 0 END)=SUM(CASE WHEN itr_total>0 THEN 1 ELSE 0 END) AND SUM(CASE WHEN itr_total>0 THEN 1 ELSE 0 END)>0 THEN 1 ELSE 0 END cssc" +
       " FROM precom_summary WHERE system_no IS NOT NULL GROUP BY system_no, subsystem)" +
       " GROUP BY system_no ORDER BY system_no");
   }
@@ -283,18 +285,20 @@
       ' ORDER BY system_no, subsystem', params);
     var byss = {};
     rows.forEach(function (r) {
-      r.dac = (r.itr_done >= r.itr_total && r.pa_o === 0) ? 1 : 0;
+      r.dac = (r.itr_total > 0 && r.itr_done >= r.itr_total && r.pa_o === 0) ? 1 : 0;
       var g = byss[r.subsystem] || (byss[r.subsystem] = {
         subsystem: r.subsystem, desc: r.subsystem_desc || '', system: r.system_no || '',
-        total: 0, done: 0, paT: 0, paO: 0, pbT: 0, pbO: 0, discN: 0, dacN: 0, disc: {}
+        total: 0, done: 0, paT: 0, paO: 0, pbT: 0, pbO: 0, discN: 0, discItrN: 0, dacN: 0, disc: {}
       });
       g.total += r.itr_total; g.done += r.itr_done;
       g.paT += r.pa_t; g.paO += r.pa_o; g.pbT += r.pb_t; g.pbO += r.pb_o;
       g.discN += 1; g.dacN += r.dac;
+      if (r.itr_total > 0) g.discItrN += 1;   // discipline co ITR-A (chi discipline nay moi tinh DAC/CSSC)
       g.disc[r.discipline] = r;
     });
     var list = Object.keys(byss).map(function (k) { return byss[k]; });
-    list.forEach(function (g) { g.cssc = (g.discN > 0 && g.dacN >= g.discN) ? 1 : 0; });
+    // CSSC = MOI discipline CO ITR-A cua subsystem da DAC (discipline chi-punch, khong ITR-A -> khong chan CSSC).
+    list.forEach(function (g) { g.cssc = (g.discItrN > 0 && g.dacN >= g.discItrN) ? 1 : 0; });
     list.sort(function (a, b) { return (a.system + a.subsystem).localeCompare(b.system + b.subsystem); });
     if (state.q) list = list.filter(function (g) {
       return g.subsystem.indexOf(state.q) >= 0 || (g.desc || '').toUpperCase().indexOf(state.q) >= 0;
@@ -1420,7 +1424,7 @@
       cap = (doneOnly ? 'Subsystem đã đạt DAC' : 'Tổng hợp theo Subsystem') + ' (' + sr.length + ')';
       head = ['#', 'System', 'Subsystem', 'Description', 'ITR done/total', '%ITR', 'PunchA', 'PunchB', 'DAC'];
       rows = sr.map(function (r, i) {
-        var dac = (r.itr_done >= r.itr_total && r.pao === 0);
+        var dac = (r.itr_total > 0 && r.itr_done >= r.itr_total && r.pao === 0);
         return '<tr class="pcm-drow ' + (dac ? 'done' : '') + '" data-ssrow="' + esc(r.subsystem) + '" data-disc="' + esc(_discCtx.disc) + '"><td>' + (i + 1) + '</td><td>' + esc(r.system_no) + '</td>' +
           '<td><b>' + esc(ssShort(r.subsystem)) + '</b></td><td>' + esc(r.subsystem_desc) + '</td>' +
           '<td>' + G(r.itr_done) + '/' + r.itr_total + '</td><td class="' + pctCls(pct(r.itr_done, r.itr_total)) + '">' + pct(r.itr_done, r.itr_total) + '%</td>' +
@@ -1435,7 +1439,7 @@
     var sub = _rptSub('Discipline ' + disc + (state.system === '__ALL__' ? '' : ' · System ' + state.system));
     var sHead = ['#', 'System', 'Subsystem', 'Description', 'ITR done', 'ITR total', '%ITR', 'PunchA closed/total', 'PunchB closed/total', 'DAC'];
     var sRows = srows.map(function (r, i) {
-      var dac = (r.itr_done >= r.itr_total && r.pao === 0);
+      var dac = (r.itr_total > 0 && r.itr_done >= r.itr_total && r.pao === 0);
       return [i + 1, r.system_no, r.subsystem, r.subsystem_desc, r.itr_done, r.itr_total, pct(r.itr_done, r.itr_total) + '%',
         r.pat ? (r.pat - r.pao) + '/' + r.pat : '-', r.pbt ? (r.pbt - r.pbo) + '/' + r.pbt : '-', dac ? 'DAC' : ''];
     });
@@ -1620,11 +1624,11 @@
       var t = window.PrecomDB.query(
         'SELECT SUM(itr_total) it, SUM(itr_done) id, SUM(COALESCE(punch_a_total,0)) pat,' +
         ' SUM(COALESCE(punch_a_open,0)) pao, SUM(COALESCE(punch_b_total,0)) pbt, SUM(COALESCE(punch_b_open,0)) pbo,' +
-        ' COUNT(*) cells, SUM(CASE WHEN itr_done>=itr_total AND COALESCE(punch_a_open,0)=0 THEN 1 ELSE 0 END) dac' +
+        ' COUNT(*) cells, SUM(CASE WHEN itr_total>0 AND itr_done>=itr_total AND COALESCE(punch_a_open,0)=0 THEN 1 ELSE 0 END) dac' +
         ' FROM precom_summary')[0] || {};
       var cssc = (window.PrecomDB.query(
         'SELECT COUNT(*) c FROM (SELECT subsystem FROM precom_summary GROUP BY subsystem' +
-        ' HAVING SUM(CASE WHEN itr_done>=itr_total AND COALESCE(punch_a_open,0)=0 THEN 1 ELSE 0 END)=COUNT(*))')[0] || {}).c || 0;
+        ' HAVING SUM(CASE WHEN itr_total>0 AND itr_done>=itr_total AND COALESCE(punch_a_open,0)=0 THEN 1 ELSE 0 END)=SUM(CASE WHEN itr_total>0 THEN 1 ELSE 0 END) AND SUM(CASE WHEN itr_total>0 THEN 1 ELSE 0 END)>0)')[0] || {}).c || 0;
       var nss = (window.PrecomDB.query('SELECT COUNT(DISTINCT subsystem) c FROM precom_summary')[0] || {}).c || 0;
       var meta = window.PrecomDB.meta();
       body.innerHTML =

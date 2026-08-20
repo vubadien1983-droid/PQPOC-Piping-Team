@@ -1,7 +1,8 @@
 // skyline.js — "Handover and Skyline" tab
 // ITR-A S-curve: Actual (complete_date) vs Skyline DAC Plan (skyline-data.js) + KPI / Punchlist / ITR detail tables.
-// Chart = DAILY, x-axis scaled to the most recent 2 weeks. Clicking any figure on the right panel
-// opens a full-screen modal with the underlying detail. Uses window.PrecomDB (itr_a, precom_summary). LAZY.
+// Chart = WEEKLY, aligned to Skyline week-ending dates; ACTUAL is cumulative to today vs the Skyline of each week.
+// Clicking any figure on the right panel opens a full-screen modal with the underlying detail.
+// DAC (achieved) requires ITR-A: itr_total>0 AND 100% ITR-A done AND Punch A closed. Uses window.PrecomDB. LAZY.
 (function () {
   'use strict';
 
@@ -115,49 +116,46 @@
     state.itrMap = m; return m;
   }
 
-  // ---- Daily S-curve data, windowed to the last 2 weeks ----
-  function buildDaily(disc) {
+  // ---- Weekly S-curve data (aligned to Skyline week-ending dates). Actual = cumulative to today. ----
+  function weekGrid() {
+    if (state.weeks) return state.weeks;
+    var set = {};
+    ((window.DAC_SKYLINE && window.DAC_SKYLINE.plan) || []).forEach(function (p) { if (p.dac) set[p.dac] = 1; });
+    state.weeks = Object.keys(set).sort();
+    return state.weeks;
+  }
+  function bucketWeek(weeks, d) { for (var i = 0; i < weeks.length; i++) { if (weeks[i] >= d) return i; } return weeks.length - 1; }
+
+  function buildWeekly(disc) {
     var map = ensureItrMap();
+    var weeks = weekGrid();
+    var idxOf = {}; weeks.forEach(function (w, i) { idxOf[w] = i; });
     var plan = (window.DAC_SKYLINE && window.DAC_SKYLINE.plan) || [];
-    var planByDay = {};
+    var planWk = weeks.map(function () { return 0; });
     plan.forEach(function (p) {
       if (!p.dac) return; if (disc && p.disc !== disc) return;
-      planByDay[p.dac] = (planByDay[p.dac] || 0) + (map[p.ss + '|' + p.disc] || 0);
+      if (idxOf[p.dac] != null) planWk[idxOf[p.dac]] += (map[p.ss + '|' + p.disc] || 0);
     });
     var actRows = window.PrecomDB.query(
       "SELECT substr(complete_date,1,10) d, COUNT(*) c FROM itr_a" +
-      " WHERE complete_date IS NOT NULL AND TRIM(complete_date)<>''" + discWhere(disc) +
-      " GROUP BY d ORDER BY d");
-    var actByDay = {}; actRows.forEach(function (r) { actByDay[r.d] = r.c; });
+      " WHERE complete_date IS NOT NULL AND TRIM(complete_date)<>''" + discWhere(disc) + " GROUP BY d");
+    var actWk = weeks.map(function () { return 0; });
+    actRows.forEach(function (r) { if (weeks.length) actWk[bucketWeek(weeks, r.d)] += r.c; });
 
     var tot = scopeTotals(disc), denom = tot.total || 1;
     var today = todayISO();
-    // Reference day = latest day (plan or actual) that is <= today; fallback today.
-    var allDays = Object.keys(planByDay).concat(Object.keys(actByDay)).filter(function (d) { return d <= today; });
-    var end = allDays.length ? allDays.sort().pop() : today;
-    var start = shiftISO(end, -(WINDOW_DAYS - 1));
+    var refIdx = weeks.length - 1;
+    for (var i = 0; i < weeks.length; i++) { if (weeks[i] >= today) { refIdx = i; break; } }
 
-    // Cumulative up to a given day (over ALL history, so cum% is true-to-date)
-    function cumUpto(byDay, day) { var s = 0; for (var k in byDay) { if (k <= day) s += byDay[k]; } return s; }
-
-    var days = [], planDay = [], actDay = [], planCum = [], actCum = [];
-    // Chart spans 2 weeks; the KPI summary "period" only reflects the LAST 1 WEEK (7 days).
-    var periodPlan = 0, periodAct = 0, planWk1 = 0, actWk1 = 0;
-    for (var i = 0; i < WINDOW_DAYS; i++) {
-      var d = shiftISO(start, i);
-      var pd = planByDay[d] || 0, ad = actByDay[d] || 0;
-      days.push(d); planDay.push(pd); actDay.push(ad);
-      periodPlan += pd; periodAct += ad;
-      if (i >= WINDOW_DAYS - 7) { planWk1 += pd; actWk1 += ad; } // last 7 days only
-      planCum.push(pct(cumUpto(planByDay, d), denom));
-      actCum.push(pct(cumUpto(actByDay, d), denom));
+    var planCum = [], actCum = [], cp = 0, ca = 0;
+    for (var i = 0; i < weeks.length; i++) {
+      cp += planWk[i]; ca += actWk[i];
+      planCum.push(pct(cp, denom)); actCum.push(pct(ca, denom));
     }
     return {
-      days: days, planDay: planDay, actDay: actDay, planCum: planCum, actCum: actCum,
-      totals: tot, end: end, denom: denom, disc: disc || null,
-      periodPlan: periodPlan, periodAct: periodAct,
-      planWk1: planWk1, actWk1: actWk1, wk1Start: shiftISO(start, WINDOW_DAYS - 7),
-      planCumEnd: pct(cumUpto(planByDay, end), denom), actCumEnd: pct(cumUpto(actByDay, end), denom)
+      weeks: weeks, planWk: planWk, actWk: actWk, planCum: planCum, actCum: actCum,
+      totals: tot, denom: denom, disc: disc || null, refIdx: refIdx, refWeek: weeks[refIdx] || today,
+      planCumEnd: planCum[refIdx] || 0, actCumEnd: actCum[refIdx] || 0
     };
   }
 
@@ -166,10 +164,10 @@
     if (state.chart) { try { state.chart.destroy(); } catch (e) {} state.chart = null; }
     state.chart = new Chart(cv, {
       data: {
-        labels: cur.days.map(fmtDay),
+        labels: cur.weeks.map(fmtDMY),
         datasets: [
-          { type: 'bar', label: 'KPI PLAN (ITR/day)', data: cur.planDay, backgroundColor: 'rgba(59,130,246,0.7)', yAxisID: 'y', order: 3 },
-          { type: 'bar', label: 'ACTUAL (ITR/day)', data: cur.actDay, backgroundColor: 'rgba(34,197,94,0.85)', yAxisID: 'y', order: 2 },
+          { type: 'bar', label: 'KPI PLAN (ITR/week)', data: cur.planWk, backgroundColor: 'rgba(59,130,246,0.7)', yAxisID: 'y', order: 3 },
+          { type: 'bar', label: 'ACTUAL (ITR/week)', data: cur.actWk, backgroundColor: 'rgba(34,197,94,0.85)', yAxisID: 'y', order: 2 },
           { type: 'line', label: 'KPI PLAN CUM %', data: cur.planCum, borderColor: '#ef4444', backgroundColor: '#ef4444', borderWidth: 2, pointRadius: 2, tension: 0.25, yAxisID: 'y1', order: 1 },
           { type: 'line', label: 'ACTUAL CUM %', data: cur.actCum, borderColor: '#a855f7', backgroundColor: '#a855f7', borderWidth: 2, pointRadius: 2, tension: 0.25, yAxisID: 'y1', order: 0 }
         ]
@@ -178,12 +176,12 @@
         responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
         plugins: {
           legend: { labels: { boxWidth: 12, font: { size: 10 }, color: '#334155' } },
-          title: { display: true, text: 'ITR-A S-Curve — ' + label + ' (daily, last 2 weeks)', color: '#0f172a', font: { size: 13, weight: 'bold' } },
+          title: { display: true, text: 'ITR-A S-Curve — ' + label + ' (weekly · actual cumulative to today)', color: '#0f172a', font: { size: 13, weight: 'bold' } },
           datalabels: { display: false }
         },
         scales: {
-          x: { ticks: { color: '#475569', font: { size: 9 }, maxRotation: 90, minRotation: 90 }, grid: { display: false } },
-          y: { position: 'left', beginAtZero: true, title: { display: true, text: 'ITR / day', color: '#475569' }, ticks: { color: '#475569', precision: 0 } },
+          x: { ticks: { color: '#475569', font: { size: 8 }, maxRotation: 90, minRotation: 90 }, grid: { display: false } },
+          y: { position: 'left', beginAtZero: true, title: { display: true, text: 'ITR / week', color: '#475569' }, ticks: { color: '#475569', precision: 0 } },
           y1: { position: 'right', beginAtZero: true, title: { display: true, text: 'Cumulative %', color: '#475569' }, grid: { drawOnChartArea: false }, ticks: { color: '#475569', callback: function (v) { return v + '%'; } } }
         }
       }
@@ -192,14 +190,14 @@
   }
 
   function kpiTable(cur) {
-    var denom = cur.denom;
-    var vr = cur.actCumEnd - cur.planCumEnd;
-    var wk = esc(fmtDay(cur.wk1Start)) + ' → ' + esc(fmtDay(cur.end));
+    var denom = cur.denom, vr = cur.actCumEnd - cur.planCumEnd;
+    var wk = esc(fmtDMY(cur.refWeek));
+    var pw = cur.planWk[cur.refIdx] || 0, aw = cur.actWk[cur.refIdx] || 0;
     return '<table class="sky-tbl"><thead><tr><th class="l">Metric</th><th>Value</th></tr></thead><tbody>' +
-      '<tr><td class="l">1. KPI PLAN (this week · ' + wk + ')</td><td>' + f1(pct(cur.planWk1, denom)) + '% (' + cur.planWk1 + ')</td></tr>' +
-      '<tr><td class="l">2. KPI PLAN CUM (to date)</td><td>' + f1(cur.planCumEnd) + '%</td></tr>' +
-      '<tr><td class="l">3. ACTUAL (this week · ' + wk + ')</td><td>' + f1(pct(cur.actWk1, denom)) + '% (' + cur.actWk1 + ')</td></tr>' +
-      '<tr><td class="l">4. ACTUAL CUM (to date)</td><td>' + f1(cur.actCumEnd) + '%</td></tr>' +
+      '<tr><td class="l">1. KPI PLAN (this week · w/e ' + wk + ')</td><td>' + f1(pct(pw, denom)) + '% (' + pw + ')</td></tr>' +
+      '<tr><td class="l">2. KPI PLAN CUM (to this week)</td><td>' + f1(cur.planCumEnd) + '%</td></tr>' +
+      '<tr><td class="l">3. ACTUAL (this week · to today)</td><td>' + f1(pct(aw, denom)) + '% (' + aw + ')</td></tr>' +
+      '<tr><td class="l">4. ACTUAL CUM (to today)</td><td>' + f1(cur.actCumEnd) + '%</td></tr>' +
       '<tr class="tot"><td class="l">VAR (Actual − Plan, cum)</td><td class="' + (vr >= 0 ? 'sky-var-pos' : 'sky-var-neg') + '">' + (vr >= 0 ? '+' : '') + f1(vr) + '%</td></tr>' +
       '</tbody></table>';
   }
@@ -370,13 +368,15 @@
       tr.onclick = function () { openSubsysDetail(tr.getAttribute('data-ss'), disc); };
     });
   }
-  function openDailyModal(cur, label) {
-    var exp = [['Day', 'KPI Plan', 'Actual', 'KPI Plan Cum %', 'Actual Cum %']];
-    var body = cur.days.map(function (d, i) {
-      exp.push([d, cur.planDay[i], cur.actDay[i], f1(cur.planCum[i]), f1(cur.actCum[i])]);
-      return '<tr><td>' + esc(fmtDay(d)) + '</td><td>' + cur.planDay[i] + '</td><td>' + cur.actDay[i] + '</td><td>' + f1(cur.planCum[i]) + '%</td><td>' + f1(cur.actCum[i]) + '%</td></tr>';
+  function openWeeklyModal(cur, label) {
+    var exp = [['Week ending', 'KPI Plan', 'Actual', 'KPI Plan Cum %', 'Actual Cum %', 'VAR %']];
+    var body = cur.weeks.map(function (w, i) {
+      var vr = cur.actCum[i] - cur.planCum[i];
+      var cls = (i === cur.refIdx) ? ' style="background:#dcecfb;font-weight:700;"' : '';
+      exp.push([fmtDMY(w), cur.planWk[i], cur.actWk[i], f1(cur.planCum[i]), f1(cur.actCum[i]), f1(vr)]);
+      return '<tr' + cls + '><td>' + esc(fmtDMY(w)) + '</td><td>' + cur.planWk[i] + '</td><td>' + cur.actWk[i] + '</td><td>' + f1(cur.planCum[i]) + '%</td><td>' + f1(cur.actCum[i]) + '%</td><td class="' + (vr >= 0 ? '' : 'aO') + '">' + (vr >= 0 ? '+' : '') + f1(vr) + '%</td></tr>';
     }).join('');
-    openModal('S-Curve Daily Data — ' + label, summaryHtml(cur.disc, null) + bigTable(['Day', 'KPI Plan', 'Actual', 'KPI Plan Cum %', 'Actual Cum %'], body, 'Last 2 weeks · daily'), exp, 'SCurve_' + label);
+    openModal('S-Curve Weekly Data — ' + label, summaryHtml(cur.disc, null) + bigTable(['Week ending', 'KPI Plan', 'Actual', 'KPI Plan Cum %', 'Actual Cum %', 'VAR %'], body, 'Weekly · actual cumulative to today · highlighted = current week'), exp, 'SCurve_' + label);
   }
 
   function exportTable(rows, name) { exportSheets([{ name: name, rows: rows }], name); }
@@ -462,7 +462,7 @@
   function renderRight(disc) {
     var right = el('sky-right'); if (!right) return;
     var label = disc ? discLabel(disc) : 'Overall CPP Topside';
-    var cur = buildDaily(disc);
+    var cur = buildWeekly(disc);
     var t = cur.totals, prog = pct(t.done, t.total);
     right.innerHTML =
       '<h3 style="margin:2px 0 4px;font-size:0.95rem;">' + esc(label) + '</h3>' +
@@ -489,11 +489,11 @@
         if (a === 'itr-all') openItrModal(disc, 'all', label + ' · All ITR-A');
         else if (a === 'itr-done') openItrModal(disc, 'done', label + ' · Complete');
         else if (a === 'itr-remain') openItrModal(disc, 'remain', label + ' · Remaining');
-        else openDailyModal(cur, label);
+        else openWeeklyModal(cur, label);
       };
     });
-    var cb = el('sky-chartbox'); if (cb) cb.onclick = function () { openDailyModal(cur, label); };
-    var kt = el('sky-kpi-tbl'); if (kt) kt.onclick = function () { openDailyModal(cur, label); };
+    var cb = el('sky-chartbox'); if (cb) cb.onclick = function () { openWeeklyModal(cur, label); };
+    var kt = el('sky-kpi-tbl'); if (kt) kt.onclick = function () { openWeeklyModal(cur, label); };
     var pt = el('sky-punch-tbl'); if (pt) pt.onclick = function () { openPunchModal(disc, label); };
     var idt = el('sky-itr-detail');
     if (idt) idt.querySelectorAll('tr[data-disc]').forEach(function (tr) {
@@ -537,7 +537,7 @@
         if (meta && window.DAC_SKYLINE && window.DAC_SKYLINE.meta) meta.textContent = 'Skyline cutoff ' + window.DAC_SKYLINE.meta.cutoff + ' · ' + window.DAC_SKYLINE.meta.rows + ' subsystem×discipline';
       }
       state.itrMap = null;
-      var xb = el('skyline-export-btn'); if (xb) xb.onclick = function () { var disc = state.sel === 'ALL' ? null : state.sel; openDailyModal(buildDaily(disc), disc ? discLabel(disc) : 'Overall CPP Topside'); };
+      var xb = el('skyline-export-btn'); if (xb) xb.onclick = function () { var disc = state.sel === 'ALL' ? null : state.sel; openWeeklyModal(buildWeekly(disc), disc ? discLabel(disc) : 'Overall CPP Topside'); };
       layout(); buildLeft();
       renderRight(state.sel === 'ALL' ? null : state.sel);
     }).catch(function (e) {
