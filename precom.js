@@ -25,6 +25,8 @@
   // Tra ve chuoi da format ('3.9'); pctCls so sanh nguong tu ep kieu chuoi->so.
   function pct(d, t) { return t > 0 ? (Math.round(d * 1000 / t) / 10).toFixed(1) : '0.0'; }
   function pctCls(p) { return p >= 80 ? 'pcm-hi' : (p >= 40 ? 'pcm-mid' : 'pcm-lo'); }
+  // Ten/mo ta cua Checksheet Type (tra tu window.CS_TYPE_DESC — file cs_type_map.js). Rong neu chua co.
+  function csDesc(t) { return (window.CS_TYPE_DESC && window.CS_TYPE_DESC[String(t || '').trim().toUpperCase()]) || ''; }
   // Chon cot AN TOAN: cot KHONG co trong bang -> 'NULL AS <cot>' de tranh loi SQL "no such column"
   // khi nguon doi/bo cot (vd ITR-A moi bo PlanStart) -> detail/detail-2 khong bi vo.
   function selSafe(table, cols) {
@@ -1111,6 +1113,7 @@
       var done = r.complete_date && String(r.complete_date).trim() !== '';
       return '<tr class="' + (done ? 'done' : '') + '"><td>' + (i + 1) + '</td><td><b>' + esc(r.tag_no) + '</b></td>' +
         '<td>' + esc(r.tag_desc) + '</td><td>' + esc(r.discipline) + '</td><td>' + esc(r.cs_type) + '</td>' +
+        '<td style="text-align:left;">' + esc(csDesc(r.cs_type)) + '</td>' +
         '<td>' + _day(r.plan_start) + '</td><td>' + _day(r.plan_finish) + '</td>' +
         '<td>' + (done ? _day(r.complete_date) : '') + '</td><td>' + esc(r.norm) + '</td></tr>';
     });
@@ -1131,7 +1134,7 @@
         kbox('Punch B Closed', pbC, pbT, '#d97706') +
         kbox('DAC (Discipline)', dacN, discN, '#7c3aed') + '</div>' +
       '<div class="pcm-chartbox"><canvas id="pcm-chart2"></canvas></div>' +
-      scrollReport('ITR-A Checksheets (' + itrRows.length + ')', ['#', 'TagNo', 'Description', 'Disc', 'CS Type', 'Plan Start', 'Plan Finish', 'Complete', 'Norm'], itrRows, 32) +
+      scrollReport('ITR-A Checksheets (' + itrRows.length + ')', ['#', 'TagNo', 'Description', 'Disc', 'CS Type', 'CS Description', 'Plan Start', 'Plan Finish', 'Complete', 'Norm'], itrRows, 32) +
       scrollReport('Punch List (' + punRows.length + ')  ·  đỏ = Cat A Open · xanh = Closed',
         ['#', 'PunchNo', 'Cat', 'Phase', 'Status', 'Disc', 'TagNo', 'Defect Description', 'Action By', 'Open', 'Closed', 'Expected'], punRows, 32);
     if (_mchart2) { try { _mchart2.destroy(); } catch (e) {} _mchart2 = null; }
