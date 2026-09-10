@@ -480,12 +480,12 @@
       ' <button class="pcm-det-btn" id="precom-det-export">Export detail Excel</button></h3>';
 
     if (state.kpiSel === 'itr') {
-      html += tableHtml(['#', 'Subsystem', 'TagNo', 'Description', 'Disc', 'ITR', 'PlanFinish', 'Complete'],
+      html += tableHtml(['#', 'Subsystem', 'TagNo', 'Description', 'Disc', 'ITR', 'CS Description', 'PlanFinish', 'Complete'],
         d.itr.map(function (r, i) {
           var done = r.complete_date && String(r.complete_date).trim() !== '';
           return '<tr class="' + (done ? 'done' : '') + '"><td>' + (i + 1) + '</td><td>' + esc(ssShort(r.subsystem)) + '</td>' +
             '<td><b>' + esc(r.tag_no) + '</b></td><td>' + esc(r.tag_desc) + '</td><td>' + esc(r.discipline) + '</td>' +
-            '<td>' + esc(r.cs_type) + '</td><td>' + day(r.plan_finish) + '</td>' +
+            '<td>' + esc(r.cs_type) + '</td><td style="text-align:left;">' + esc(csDesc(r.cs_type)) + '</td><td>' + day(r.plan_finish) + '</td>' +
             '<td>' + (done ? day(r.complete_date) : '') + '</td></tr>';
         }), 800);
     } else if (state.kpiSel === 'pa') {
@@ -543,6 +543,7 @@
       var done = r.complete_date && String(r.complete_date).trim() !== '';
       return '<tr class="' + (done ? 'done' : '') + '"><td>' + (i + 1) + '</td><td><b>' + esc(r.tag_no) + '</b></td>' +
         '<td>' + esc(r.tag_desc) + '</td><td>' + esc(r.discipline) + '</td><td>' + esc(r.cs_type) + '</td>' +
+        '<td style="text-align:left;">' + esc(csDesc(r.cs_type)) + '</td>' +
         '<td>' + day(r.plan_start) + '</td><td>' + day(r.plan_finish) + '</td>' +
         '<td>' + (done ? day(r.complete_date) : '') + '</td><td>' + esc(r.norm) + '</td></tr>';
     }).join('');
@@ -564,8 +565,8 @@
       ' <button class="pcm-det-btn" id="precom-det-export">Export detail Excel</button>' +
       ' <span style="font-weight:400;color:#5b6b80;">(ITR-A: ' + d.itr.length + ' dòng · Punch: ' + d.pun.length + ' dòng)</span></h3>' +
       '<h3>ITR-A Checksheets</h3>' +
-      '<div class="det-wrap"><table><thead><tr><th>#</th><th>TagNo</th><th>Description</th><th>Disc</th><th>ITR</th><th>PlanStart</th><th>PlanFinish</th><th>Complete</th><th>Norm</th></tr></thead>' +
-      '<tbody>' + (itrRows || '<tr><td colspan="9">Không có ITR-A trong phạm vi này.</td></tr>') + '</tbody></table></div>' +
+      '<div class="det-wrap"><table><thead><tr><th>#</th><th>TagNo</th><th>Description</th><th>Disc</th><th>ITR</th><th>CS Description</th><th>PlanStart</th><th>PlanFinish</th><th>Complete</th><th>Norm</th></tr></thead>' +
+      '<tbody>' + (itrRows || '<tr><td colspan="10">Không có ITR-A trong phạm vi này.</td></tr>') + '</tbody></table></div>' +
       '<h3 style="margin-top:8px;">Punch List <span style="font-weight:400;color:#5b6b80;">(đỏ = Cat A đang Open, xanh = Closed)</span></h3>' +
       '<div class="det-wrap"><table><thead><tr><th>#</th><th>PunchNo</th><th>RaisedNo</th><th>Cat</th><th>Status</th><th>Disc</th><th>TagNo</th><th>Defect Description</th><th>ActionBy</th><th>Open</th><th>Closed</th><th>Expected</th><th>Phase</th></tr></thead>' +
       '<tbody>' + (punRows || '<tr><td colspan="13">Không có punch trong phạm vi này.</td></tr>') + '</tbody></table></div>';
@@ -1221,6 +1222,7 @@
         var done = r.complete_date && String(r.complete_date).trim() !== '';
         return '<tr class="' + (done ? 'done' : '') + '"><td>' + (i + 1) + '</td><td><b>' + esc(r.tag_no) + '</b></td>' +
           '<td>' + esc(r.tag_desc) + '</td><td>' + esc(r.discipline) + '</td><td>' + esc(r.cs_type) + '</td>' +
+          '<td style="text-align:left;">' + esc(csDesc(r.cs_type)) + '</td>' +
           '<td>' + _day(r.plan_start) + '</td><td>' + _day(r.plan_finish) + '</td>' +
           '<td>' + (done ? _day(r.complete_date) : '') + '</td><td>' + esc(r.norm) + '</td></tr>';
       });
@@ -1266,7 +1268,7 @@
         (disc ? ' · Discipline: ' + disc : ' · Tất cả discipline');
       el('pcm-dfwrap').innerHTML =
         pcmDiscBar(items, disc) +
-        scrollReport('ITR-A Checksheets (' + fitr.length + ')', ['#', 'TagNo', 'Description', 'Disc', 'ITR', 'Plan Start', 'Plan Finish', 'Complete', 'Norm'], itrRowsHtml(fitr), 32) +
+        scrollReport('ITR-A Checksheets (' + fitr.length + ')', ['#', 'TagNo', 'Description', 'Disc', 'ITR', 'CS Description', 'Plan Start', 'Plan Finish', 'Complete', 'Norm'], itrRowsHtml(fitr), 32) +
         scrollReport('Punch List (' + fpun.length + ')  ·  đỏ = Cat A Open · xanh = Closed', ['#', 'PunchNo', 'Cat', 'Phase', 'Status', 'Disc', 'TagNo', 'Defect Description', 'Action By', 'Open', 'Closed', 'Expected'], punRowsHtml(fpun), 32);
       wireDiscFilter(el('pcm-dfwrap'));
       el('pcm-export').onclick = function () { exportScope(label + (disc ? ' · ' + disc : ''), { itr: fitr, pun: fpun }); };
@@ -1282,12 +1284,12 @@
                      dac: 'DAC — Subsystem × Discipline', cssc: 'CSSC — Subsystem' };
     var cap = titleMap[key], head, rows;
     if (key === 'itr') {
-      head = ['#', 'Subsystem', 'TagNo', 'Description', 'Disc', 'ITR', 'Plan Finish', 'Complete'];
+      head = ['#', 'Subsystem', 'TagNo', 'Description', 'Disc', 'ITR', 'CS Description', 'Plan Finish', 'Complete'];
       rows = d.itr.map(function (r, i) {
         var done = r.complete_date && String(r.complete_date).trim() !== '';
         return '<tr class="' + (done ? 'done' : '') + '"><td>' + (i + 1) + '</td><td>' + esc(ssShort(r.subsystem)) + '</td>' +
           '<td><b>' + esc(r.tag_no) + '</b></td><td>' + esc(r.tag_desc) + '</td><td>' + esc(r.discipline) + '</td>' +
-          '<td>' + esc(r.cs_type) + '</td><td>' + _day(r.plan_finish) + '</td><td>' + (done ? _day(r.complete_date) : '') + '</td></tr>';
+          '<td>' + esc(r.cs_type) + '</td><td style="text-align:left;">' + esc(csDesc(r.cs_type)) + '</td><td>' + _day(r.plan_finish) + '</td><td>' + (done ? _day(r.complete_date) : '') + '</td></tr>';
       });
     } else if (key === 'pa') {
       head = ['#', 'Subsystem', 'PunchNo', 'Cat', 'Phase', 'Status', 'Disc', 'TagNo', 'Defect Description', 'Action By', 'Open', 'Closed'];
