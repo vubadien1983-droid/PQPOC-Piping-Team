@@ -85,6 +85,10 @@
     '.sky-rtbl td.mono{font-family:ui-monospace,Consolas,monospace;font-weight:600;}' +
     '.sky-rtbl tbody tr.sky-rrow{cursor:pointer;}' +
     '.sky-rtbl tbody tr.sky-rrow:hover{background:#dcecfb;}' +
+    // current week highlight (green)
+    '.sky-rtbl tbody tr.sky-wk-now{background:#dcfce7!important;font-weight:700;box-shadow:inset 3px 0 0 #16a34a;}' +
+    '.sky-rtbl tbody tr.sky-wk-now:hover{background:#bbf7d0!important;}' +
+    '.sky-rtbl tbody td.na{color:#94a3b8;}' +
     // header summary strip (Actual vs Skyline plan)
     '.sky-sumwrap{padding:10px 16px 4px;}' +
     '.sky-sum{border-collapse:collapse;font-size:0.72rem;background:#fff;box-shadow:0 1px 3px rgba(15,32,55,0.07);}' +
@@ -314,15 +318,23 @@
     var dacPlan;
     if (ss) dacPlan = s.dates.length ? (esc(fmtDMY(s.dates[0])) + (s.dacPlanDue ? ' · due' : ' · upcoming')) : '—';
     else dacPlan = s.dates.length ? (s.dacPlanDue + '/' + s.dacPlanTot + ' due · ' + esc(fmtDMY(s.dates[0])) + '→' + esc(fmtDMY(s.dates[s.dates.length - 1]))) : '—';
-    function r(item, tot, closed, open, planTxt) {
+    // planDue = so luong LE RA phai xong tinh den hom nay (theo skyline); null = khong co skyline (Punch)
+    function r(item, tot, closed, open, planDue, planTxt) {
+      var actP = pct(closed, tot);
+      var hasPlan = (planDue != null && s.dates.length);
+      var planP = hasPlan ? pct(planDue, tot) : null;
+      var vr = hasPlan ? (actP - planP) : null;
       return '<tr><td class="l">' + item + '</td><td>' + tot + '</td><td class="aC">' + closed + '</td><td class="aO">' + open +
-        '</td><td>' + f1(pct(closed, tot)) + '%</td><td class="plan">' + planTxt + '</td></tr>';
+        '</td><td class="plan">' + (hasPlan ? f1(planP) + '%' : '—') + '</td>' +
+        '<td>' + f1(actP) + '%</td>' +
+        '<td class="' + (vr == null ? '' : (vr >= 0 ? 'aC' : 'aO')) + '">' + (vr == null ? '—' : (vr >= 0 ? '+' : '') + f1(vr) + '%') + '</td>' +
+        '<td class="plan">' + planTxt + '</td></tr>';
     }
     return '<div class="sky-sumwrap"><table class="sky-sum">' +
-      '<thead><tr><th>Item</th><th>Total</th><th>Closed</th><th>Open</th><th>Actual %</th><th>Skyline Plan (≤ today)</th></tr></thead><tbody>' +
-      r('ITR-A', s.itrT, s.itrD, s.itrO, s.dates.length ? (s.itrPlanDue + ' due') : '—') +
-      r('Punch A/B/C', s.punT, s.punC, s.punO, '—') +
-      r('DAC (subsys×disc)', s.units, s.dacAch, s.dacOpen, dacPlan) +
+      '<thead><tr><th>Item</th><th>Total</th><th>Closed</th><th>Open</th><th>KPI Plan Cum %</th><th>Actual %</th><th>VAR %</th><th>Skyline Plan (≤ today)</th></tr></thead><tbody>' +
+      r('ITR-A', s.itrT, s.itrD, s.itrO, s.itrPlanDue, s.dates.length ? (s.itrPlanDue + ' due') : '—') +
+      r('Punch A/B/C', s.punT, s.punC, s.punO, null, '—') +
+      r('DAC (subsys×disc)', s.units, s.dacAch, s.dacOpen, s.dacPlanDue, dacPlan) +
       '</tbody></table></div>';
   }
 
@@ -381,15 +393,97 @@
       tr.onclick = function () { openSubsysDetail(tr.getAttribute('data-ss'), disc); };
     });
   }
+  function csd(t) { return (window.CS_TYPE_DESC && window.CS_TYPE_DESC[String(t || '').trim().toUpperCase()]) || ''; }
+
   function openWeeklyModal(cur, label) {
     var exp = [['Week ending', 'KPI Plan', 'Actual', 'KPI Plan Cum %', 'Actual Cum %', 'VAR %']];
     var body = cur.weeks.map(function (w, i) {
+      // Sau tuan hien tai chua co du lieu thuc te -> Actual Cum % / VAR % de "—"
+      var future = i > cur.refIdx;
       var vr = cur.actCum[i] - cur.planCum[i];
-      var cls = (i === cur.refIdx) ? ' style="background:#dcecfb;font-weight:700;"' : '';
-      exp.push([fmtDMY(w), cur.planWk[i], cur.actWk[i], f1(cur.planCum[i]), f1(cur.actCum[i]), f1(vr)]);
-      return '<tr' + cls + '><td>' + esc(fmtDMY(w)) + '</td><td>' + cur.planWk[i] + '</td><td>' + cur.actWk[i] + '</td><td>' + f1(cur.planCum[i]) + '%</td><td>' + f1(cur.actCum[i]) + '%</td><td class="' + (vr >= 0 ? '' : 'aO') + '">' + (vr >= 0 ? '+' : '') + f1(vr) + '%</td></tr>';
+      var cls = ' class="sky-rrow' + (i === cur.refIdx ? ' sky-wk-now' : '') + '" data-wk="' + i + '"';
+      exp.push([fmtDMY(w), cur.planWk[i], cur.actWk[i], f1(cur.planCum[i]), future ? '' : f1(cur.actCum[i]), future ? '' : f1(vr)]);
+      return '<tr' + cls + '><td>' + esc(fmtDMY(w)) + '</td><td>' + cur.planWk[i] + '</td><td>' + cur.actWk[i] +
+        '</td><td>' + f1(cur.planCum[i]) + '%</td>' +
+        '<td' + (future ? ' class="na"' : '') + '>' + (future ? '—' : f1(cur.actCum[i]) + '%') + '</td>' +
+        '<td class="' + (future ? 'na' : (vr >= 0 ? '' : 'aO')) + '">' + (future ? '—' : (vr >= 0 ? '+' : '') + f1(vr) + '%') + '</td></tr>';
     }).join('');
-    openModal('S-Curve Weekly Data — ' + label, summaryHtml(cur.disc, null) + bigTable(['Week ending', 'KPI Plan', 'Actual', 'KPI Plan Cum %', 'Actual Cum %', 'VAR %'], body, 'Weekly · actual cumulative to today · highlighted = current week'), exp, 'SCurve_' + label);
+    openModal('S-Curve Weekly Data — ' + label,
+      summaryHtml(cur.disc, null) + bigTable(['Week ending', 'KPI Plan', 'Actual', 'KPI Plan Cum %', 'Actual Cum %', 'VAR %'], body,
+        'Weekly · actual cumulative to today · green = current week · click a row for that week’s ITR-A detail'),
+      exp, 'SCurve_' + label);
+    el('sky-modal-body').querySelectorAll('tr[data-wk]').forEach(function (tr) {
+      tr.onclick = function () { openWeekDetail(cur, +tr.getAttribute('data-wk'), label); };
+    });
+  }
+
+  // ---- Detail-2 cho 1 TUAN: ITR-A theo Skyline (den han tuan nay) + ITR-A da done trong tuan ----
+  function openWeekDetail(cur, i, label) {
+    var W = cur.weeks[i], lo = i > 0 ? cur.weeks[i - 1] : null, disc = cur.disc;
+    var COLS = ['Tag No', 'Description', 'Subsystem', 'Discipline', 'ITR (CS Type)', 'CS Description', 'Plan Finish', 'Complete Date', 'Status'];
+    function rowHtml(r) {
+      var done = r.complete_date && String(r.complete_date).trim();
+      return '<tr class="sky-rrow" data-rt="itr" data-ss="' + esc(r.subsystem) + '" data-tag="' + esc(r.tag_no) + '" data-cs="' + esc(r.cs_type || '') + '">' +
+        '<td class="mono">' + esc(r.tag_no) + '</td><td class="l">' + esc(r.tag_desc || '') + '</td>' +
+        '<td class="mono">' + esc(r.subsystem) + '</td><td>' + esc(r.discipline || '') + '</td>' +
+        '<td>' + esc(r.cs_type || '') + '</td><td class="l">' + esc(csd(r.cs_type)) + '</td>' +
+        '<td>' + esc(r.plan_finish || '') + '</td><td>' + esc(r.complete_date || '') + '</td><td>' +
+        (done ? '<span class="sky-badge-done">Complete</span>' : '<span class="sky-badge-open">Open</span>') + '</td></tr>';
+    }
+    function expRows(list) {
+      var e = [COLS.slice()];
+      list.forEach(function (r) {
+        e.push([r.tag_no, r.tag_desc, r.subsystem, r.discipline, r.cs_type, csd(r.cs_type), r.plan_finish || '', r.complete_date || '',
+          (r.complete_date && String(r.complete_date).trim()) ? 'Complete' : 'Open']);
+      });
+      return e;
+    }
+
+    // 1) SKYLINE PLAN: cac subsystem x discipline co ngay DAC = tuan nay -> lay ITR-A cua chung
+    var plan = (window.DAC_SKYLINE && window.DAC_SKYLINE.plan) || [];
+    var pairs = {}, sss = {};
+    plan.forEach(function (p) {
+      if (p.dac !== W) return; if (disc && p.disc !== disc) return;
+      pairs[p.ss + '|' + p.disc] = 1; sss[p.ss] = 1;
+    });
+    var ssList = Object.keys(sss), planRows = [];
+    if (ssList.length) {
+      var ph = ssList.map(function () { return '?'; }).join(',');
+      planRows = window.PrecomDB.query(
+        "SELECT tag_no, tag_desc, subsystem, discipline, cs_type, plan_finish, complete_date FROM itr_a" +
+        " WHERE subsystem IN (" + ph + ")" + discWhere(disc) +
+        " ORDER BY subsystem, tag_no LIMIT " + LIMIT, ssList)
+        .filter(function (r) { return pairs[r.subsystem + '|' + String(r.discipline || '').toUpperCase()]; });
+    }
+
+    // 2) ACTUAL: ITR-A co complete_date roi vao tuan nay
+    var p2 = [W], w2 = " AND substr(complete_date,1,10)<=?";
+    if (lo) { w2 += " AND substr(complete_date,1,10)>?"; p2.push(lo); }
+    var actRows = window.PrecomDB.query(
+      "SELECT tag_no, tag_desc, subsystem, discipline, cs_type, plan_finish, complete_date FROM itr_a" +
+      " WHERE complete_date IS NOT NULL AND TRIM(complete_date)<>''" + discWhere(disc) + w2 +
+      " ORDER BY complete_date, subsystem, tag_no LIMIT " + LIMIT, p2);
+
+    var planDone = planRows.filter(function (r) { return r.complete_date && String(r.complete_date).trim(); }).length;
+    var html =
+      '<div class="sky-sumwrap"><table class="sky-sum"><thead><tr><th>Week ending</th><th>Scope</th>' +
+      '<th>KPI Plan (ITR-A)</th><th>Plan already done</th><th>Actual done in week</th><th>Coverage</th></tr></thead><tbody>' +
+      '<tr><td class="l">' + esc(fmtDMY(W)) + (i === cur.refIdx ? ' <b style="color:#16a34a;">(current week)</b>' : '') +
+      '</td><td>' + esc(label) + '</td><td class="plan">' + planRows.length + '</td>' +
+      '<td class="aC">' + planDone + '</td><td class="aC">' + actRows.length + '</td>' +
+      '<td>' + f1(pct(planDone, planRows.length)) + '%</td></tr></tbody></table></div>' +
+      '<div class="sky-sec-title" style="margin:8px 16px 4px;">Skyline plan — ITR-A due this week (' + planRows.length + ')</div>' +
+      bigTable(COLS, planRows.map(rowHtml).join('') ||
+        '<tr><td colspan="9" style="text-align:center;padding:14px;">No skyline plan for this week.</td></tr>', null) +
+      '<div class="sky-sec-title" style="margin:16px 16px 4px;">Actual — ITR-A completed in this week (' + actRows.length + ')</div>' +
+      bigTable(COLS, actRows.map(rowHtml).join('') ||
+        '<tr><td colspan="9" style="text-align:center;padding:14px;">No ITR-A completed in this week.</td></tr>', null);
+
+    openModal2('Week ' + fmtDMY(W) + ' · ' + label, html, function () {
+      exportSheets([{ name: 'Skyline plan', rows: expRows(planRows) }, { name: 'Actual done', rows: expRows(actRows) }],
+        ('Week_' + fmtDMY(W) + '_' + label).replace(/[^\w-]+/g, '_'));
+    });
+    wireRecs(el('sky-m2-body'));
   }
 
   function exportTable(rows, name) { exportSheets([{ name: name, rows: rows }], name); }
