@@ -478,24 +478,41 @@
       " WHERE complete_date IS NOT NULL AND TRIM(complete_date)<>''" + discWhere(disc) + w2 +
       " ORDER BY complete_date, subsystem, tag_no LIMIT " + LIMIT, p2);
 
+    // Trong khoi ke hoach cong don: phan biet "da dong TU TRUOC tuan nay" vs "dong TRONG tuan nay".
+    function closedInWeek(r) {
+      if (!r.complete_date || !String(r.complete_date).trim()) return false;
+      var d = String(r.complete_date).slice(0, 10);
+      return d <= W && (!lo || d > lo);
+    }
     var planDone = planRows.filter(function (r) { return r.complete_date && String(r.complete_date).trim(); }).length;
     var planOpen = planRows.length - planDone;
+    var planClosedThisWk = planRows.filter(closedInWeek).length;
+    var planDoneBefore = planDone - planClosedThisWk;
+    // CHI hien: cac ITR-A theo ke hoach con OPEN + cac ITR-A dong TRONG tuan nay.
+    // (Bo cac ITR-A da dong tu tuan truoc -> tranh nhin nham voi cot Actual cua tuan.)
+    var planShown = planRows.filter(function (r) {
+      var done = r.complete_date && String(r.complete_date).trim();
+      return !done || closedInWeek(r);
+    });
     var html =
       '<div class="sky-sumwrap"><table class="sky-sum"><thead><tr><th>Week ending</th><th>Scope</th>' +
-      '<th>KPI Plan cum (ITR-A due ≤ week)</th><th>Already done</th><th>Still open</th><th>Actual done in week</th><th>Coverage</th></tr></thead><tbody>' +
+      '<th>KPI Plan cum (ITR-A due ≤ week)</th><th>Done before this week</th><th>Closed in this week</th>' +
+      '<th>Still open</th><th>Actual done in week</th><th>Coverage</th></tr></thead><tbody>' +
       '<tr><td class="l">' + esc(fmtDMY(W)) + (i === cur.refIdx ? ' <b style="color:#16a34a;">(current week)</b>' : '') +
       '</td><td>' + esc(label) + '</td><td class="plan">' + planRows.length + '</td>' +
-      '<td class="aC">' + planDone + '</td><td class="aO">' + planOpen + '</td><td class="aC">' + actRows.length + '</td>' +
+      '<td>' + planDoneBefore + '</td><td class="aC">' + planClosedThisWk + '</td><td class="aO">' + planOpen + '</td>' +
+      '<td class="aC">' + actRows.length + '</td>' +
       '<td>' + f1(pct(planDone, planRows.length)) + '%</td></tr></tbody></table></div>' +
-      '<div class="sky-sec-title" style="margin:8px 16px 4px;">Skyline plan (cumulative) — ITR-A due up to ' + esc(fmtDMY(W)) + ' (' + planRows.length + ')</div>' +
-      bigTable(COLS, planRows.map(rowHtml).join('') ||
-        '<tr><td colspan="9" style="text-align:center;padding:14px;">No skyline plan up to this week.</td></tr>', null) +
+      '<div class="sky-sec-title" style="margin:8px 16px 4px;">Skyline plan (cumulative) — outstanding ITR-A due up to ' +
+      esc(fmtDMY(W)) + ' (' + planShown.length + ' / ' + planRows.length + ' planned · đã đóng từ tuần trước: ' + planDoneBefore + ' — không liệt kê)</div>' +
+      bigTable(COLS, planShown.map(rowHtml).join('') ||
+        '<tr><td colspan="9" style="text-align:center;padding:14px;">Không còn ITR-A nào Open theo kế hoạch đến tuần này.</td></tr>', null) +
       '<div class="sky-sec-title" style="margin:16px 16px 4px;">Actual — ITR-A completed in this week (' + actRows.length + ')</div>' +
       bigTable(COLS, actRows.map(rowHtml).join('') ||
         '<tr><td colspan="9" style="text-align:center;padding:14px;">No ITR-A completed in this week.</td></tr>', null);
 
     openModal2('Week ' + fmtDMY(W) + ' · ' + label, html, function () {
-      exportSheets([{ name: 'Skyline plan cum', rows: expRows(planRows) }, { name: 'Actual in week', rows: expRows(actRows) }],
+      exportSheets([{ name: 'Plan outstanding', rows: expRows(planShown) }, { name: 'Actual in week', rows: expRows(actRows) }],
         ('Week_' + fmtDMY(W) + '_' + label).replace(/[^\w-]+/g, '_'));
     });
     wireRecs(el('sky-m2-body'));
