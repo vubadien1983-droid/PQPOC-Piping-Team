@@ -159,13 +159,16 @@
     var refIdx = weeks.length - 1;
     for (var i = 0; i < weeks.length; i++) { if (weeks[i] >= today) { refIdx = i; break; } }
 
-    var planCum = [], actCum = [], cp = 0, ca = 0;
+    // planCumN / actCumN = SO LUONG cong don (khong phai %) — dung cho cot "KPI Plan: tuan / cong don"
+    var planCum = [], actCum = [], planCumN = [], actCumN = [], cp = 0, ca = 0;
     for (var i = 0; i < weeks.length; i++) {
       cp += planWk[i]; ca += actWk[i];
+      planCumN.push(cp); actCumN.push(ca);
       planCum.push(pct(cp, denom)); actCum.push(pct(ca, denom));
     }
     return {
       weeks: weeks, planWk: planWk, actWk: actWk, planCum: planCum, actCum: actCum,
+      planCumN: planCumN, actCumN: actCumN,
       totals: tot, denom: denom, disc: disc || null, refIdx: refIdx, refWeek: weeks[refIdx] || today,
       planCumEnd: planCum[refIdx] || 0, actCumEnd: actCum[refIdx] || 0
     };
@@ -396,21 +399,30 @@
   function csd(t) { return (window.CS_TYPE_DESC && window.CS_TYPE_DESC[String(t || '').trim().toUpperCase()]) || ''; }
 
   function openWeeklyModal(cur, label) {
-    var exp = [['Week ending', 'KPI Plan', 'Actual', 'KPI Plan Cum %', 'Actual Cum %', 'VAR %']];
+    var exp = [['Week ending', 'KPI Plan (week)', 'KPI Plan (cum)', 'Actual', 'KPI Plan Cum %', 'Actual Cum %', 'VAR %']];
     var body = cur.weeks.map(function (w, i) {
       // Sau tuan hien tai chua co du lieu thuc te -> Actual Cum % / VAR % de "—"
       var future = i > cur.refIdx;
       var vr = cur.actCum[i] - cur.planCum[i];
+      // Cong don ke hoach vs cong don thuc te: plan cum <= actual cum => AHEAD (xanh), nguoc lai CHAM (do).
+      // CHI tinh/hien cho tuan <= tuan hien tai. Tuan TUONG LAI chua co co so danh gia -> hien "—".
+      var cumCls = future ? 'na' : (cur.planCumN[i] <= cur.actCumN[i] ? 'aC' : 'aO');
+      var cumTxt = future ? '—' : cur.planCumN[i];
       var cls = ' class="sky-rrow' + (i === cur.refIdx ? ' sky-wk-now' : '') + '" data-wk="' + i + '"';
-      exp.push([fmtDMY(w), cur.planWk[i], cur.actWk[i], f1(cur.planCum[i]), future ? '' : f1(cur.actCum[i]), future ? '' : f1(vr)]);
-      return '<tr' + cls + '><td>' + esc(fmtDMY(w)) + '</td><td>' + cur.planWk[i] + '</td><td>' + cur.actWk[i] +
-        '</td><td>' + f1(cur.planCum[i]) + '%</td>' +
+      exp.push([fmtDMY(w), cur.planWk[i], future ? '' : cur.planCumN[i], cur.actWk[i], f1(cur.planCum[i]), future ? '' : f1(cur.actCum[i]), future ? '' : f1(vr)]);
+      return '<tr' + cls + '><td>' + esc(fmtDMY(w)) + '</td>' +
+        '<td>' + cur.planWk[i] + ' <span class="' + cumCls + '" title="' +
+        (future ? 'Tuần sau tuần hiện tại — chưa có cơ sở tính cộng dồn thực tế'
+                : 'Cộng dồn kế hoạch skyline đến tuần này (xanh = đang vượt tiến độ, đỏ = đang chậm)') +
+        '">/ ' + cumTxt + '</span></td>' +
+        '<td>' + cur.actWk[i] + '</td>' +
+        '<td>' + f1(cur.planCum[i]) + '%</td>' +
         '<td' + (future ? ' class="na"' : '') + '>' + (future ? '—' : f1(cur.actCum[i]) + '%') + '</td>' +
         '<td class="' + (future ? 'na' : (vr >= 0 ? '' : 'aO')) + '">' + (future ? '—' : (vr >= 0 ? '+' : '') + f1(vr) + '%') + '</td></tr>';
     }).join('');
     openModal('S-Curve Weekly Data — ' + label,
-      summaryHtml(cur.disc, null) + bigTable(['Week ending', 'KPI Plan', 'Actual', 'KPI Plan Cum %', 'Actual Cum %', 'VAR %'], body,
-        'Weekly · actual cumulative to today · green = current week · click a row for that week’s ITR-A detail'),
+      summaryHtml(cur.disc, null) + bigTable(['Week ending', 'KPI Plan (week / cum)', 'Actual', 'KPI Plan Cum %', 'Actual Cum %', 'VAR %'], body,
+        'Weekly · KPI Plan = tuần / cộng dồn (xanh = ahead, đỏ = chậm) — cộng dồn chỉ tính ĐẾN tuần hiện tại, các tuần sau để "—" · dòng xanh lá = tuần hiện tại · click 1 dòng để xem ITR-A cộng dồn'),
       exp, 'SCurve_' + label);
     el('sky-modal-body').querySelectorAll('tr[data-wk]').forEach(function (tr) {
       tr.onclick = function () { openWeekDetail(cur, +tr.getAttribute('data-wk'), label); };
@@ -439,11 +451,13 @@
       return e;
     }
 
-    // 1) SKYLINE PLAN: cac subsystem x discipline co ngay DAC = tuan nay -> lay ITR-A cua chung
+    // 1) SKYLINE PLAN (CONG DON): moi subsystem x discipline co ngay DAC <= tuan nay -> lay ITR-A cua chung.
+    //    Vi cong don nen se co ca cac ITR-A den han tuan truoc va DA close truoc do -> giai thich duoc
+    //    vi sao Status=Complete xuat hien o day nhung khong nam trong "Actual completed in this week".
     var plan = (window.DAC_SKYLINE && window.DAC_SKYLINE.plan) || [];
     var pairs = {}, sss = {};
     plan.forEach(function (p) {
-      if (p.dac !== W) return; if (disc && p.disc !== disc) return;
+      if (!p.dac || p.dac > W) return; if (disc && p.disc !== disc) return;
       pairs[p.ss + '|' + p.disc] = 1; sss[p.ss] = 1;
     });
     var ssList = Object.keys(sss), planRows = [];
@@ -465,22 +479,23 @@
       " ORDER BY complete_date, subsystem, tag_no LIMIT " + LIMIT, p2);
 
     var planDone = planRows.filter(function (r) { return r.complete_date && String(r.complete_date).trim(); }).length;
+    var planOpen = planRows.length - planDone;
     var html =
       '<div class="sky-sumwrap"><table class="sky-sum"><thead><tr><th>Week ending</th><th>Scope</th>' +
-      '<th>KPI Plan (ITR-A)</th><th>Plan already done</th><th>Actual done in week</th><th>Coverage</th></tr></thead><tbody>' +
+      '<th>KPI Plan cum (ITR-A due ≤ week)</th><th>Already done</th><th>Still open</th><th>Actual done in week</th><th>Coverage</th></tr></thead><tbody>' +
       '<tr><td class="l">' + esc(fmtDMY(W)) + (i === cur.refIdx ? ' <b style="color:#16a34a;">(current week)</b>' : '') +
       '</td><td>' + esc(label) + '</td><td class="plan">' + planRows.length + '</td>' +
-      '<td class="aC">' + planDone + '</td><td class="aC">' + actRows.length + '</td>' +
+      '<td class="aC">' + planDone + '</td><td class="aO">' + planOpen + '</td><td class="aC">' + actRows.length + '</td>' +
       '<td>' + f1(pct(planDone, planRows.length)) + '%</td></tr></tbody></table></div>' +
-      '<div class="sky-sec-title" style="margin:8px 16px 4px;">Skyline plan — ITR-A due this week (' + planRows.length + ')</div>' +
+      '<div class="sky-sec-title" style="margin:8px 16px 4px;">Skyline plan (cumulative) — ITR-A due up to ' + esc(fmtDMY(W)) + ' (' + planRows.length + ')</div>' +
       bigTable(COLS, planRows.map(rowHtml).join('') ||
-        '<tr><td colspan="9" style="text-align:center;padding:14px;">No skyline plan for this week.</td></tr>', null) +
+        '<tr><td colspan="9" style="text-align:center;padding:14px;">No skyline plan up to this week.</td></tr>', null) +
       '<div class="sky-sec-title" style="margin:16px 16px 4px;">Actual — ITR-A completed in this week (' + actRows.length + ')</div>' +
       bigTable(COLS, actRows.map(rowHtml).join('') ||
         '<tr><td colspan="9" style="text-align:center;padding:14px;">No ITR-A completed in this week.</td></tr>', null);
 
     openModal2('Week ' + fmtDMY(W) + ' · ' + label, html, function () {
-      exportSheets([{ name: 'Skyline plan', rows: expRows(planRows) }, { name: 'Actual done', rows: expRows(actRows) }],
+      exportSheets([{ name: 'Skyline plan cum', rows: expRows(planRows) }, { name: 'Actual in week', rows: expRows(actRows) }],
         ('Week_' + fmtDMY(W) + '_' + label).replace(/[^\w-]+/g, '_'));
     });
     wireRecs(el('sky-m2-body'));
