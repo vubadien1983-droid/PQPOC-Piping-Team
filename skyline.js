@@ -96,6 +96,14 @@
     '.sky-modal2{position:fixed;inset:0;z-index:1500;background:rgba(15,32,55,0.42);display:none;}' +
     '.sky-modal2.open{display:flex;}' +
     '.sky-drillhint{font-size:0.66rem;color:#0369a1;font-weight:600;margin-left:6px;}' +
+    // level-3 single-record detail modal (stacks above level-1/2)
+    '.sky-modal3{position:fixed;inset:0;z-index:1600;background:rgba(15,32,55,0.48);display:none;}' +
+    '.sky-modal3.open{display:flex;}' +
+    '.sky-rec-wrap{padding:14px 18px;}' +
+    '.sky-rec{width:100%;max-width:820px;border-collapse:collapse;font-size:0.78rem;background:#fff;box-shadow:0 2px 10px rgba(15,32,55,0.12);}' +
+    '.sky-rec td{border:1px solid #dbe4ee;padding:7px 12px;vertical-align:top;}' +
+    '.sky-rec td.k{background:#eef4fb;color:#12324f;font-weight:700;width:220px;white-space:nowrap;}' +
+    '.sky-rec td.v{color:#22303f;word-break:break-word;white-space:pre-wrap;}' +
     '</style>';
 
   function clsProg(p) { return p >= 75 ? 'sky-hi' : p >= 40 ? 'sky-mid' : 'sky-lo'; }
@@ -250,7 +258,8 @@
     d.addEventListener('click', function (e) { if (e.target === d) closeModal(); });
     document.addEventListener('keydown', function (e) {
       if (e.key !== 'Escape') return;
-      if (el('sky-modal2') && el('sky-modal2').classList.contains('open')) closeModal2();
+      if (el('sky-modal3') && el('sky-modal3').classList.contains('open')) closeModal3();
+      else if (el('sky-modal2') && el('sky-modal2').classList.contains('open')) closeModal2();
       else closeModal();
     });
   }
@@ -331,12 +340,14 @@
     var body = rows.map(function (r) {
       var done = r.complete_date && String(r.complete_date).trim();
       exp.push([r.tag_no, r.subsystem, r.discipline, r.cs_type, r.plan_finish || '', r.complete_date || '', done ? 'Complete' : 'Open']);
-      return '<tr><td class="mono">' + esc(r.tag_no) + '</td><td class="mono">' + esc(r.subsystem) + '</td><td>' + esc(r.discipline) + '</td><td>' + esc(r.cs_type || '') +
+      return '<tr class="sky-rrow" data-rt="itr" data-ss="' + esc(r.subsystem) + '" data-tag="' + esc(r.tag_no) + '" data-cs="' + esc(r.cs_type || '') + '">' +
+        '<td class="mono">' + esc(r.tag_no) + '</td><td class="mono">' + esc(r.subsystem) + '</td><td>' + esc(r.discipline) + '</td><td>' + esc(r.cs_type || '') +
         '</td><td>' + esc(r.plan_finish || '') + '</td><td>' + esc(r.complete_date || '') + '</td><td>' +
         (done ? '<span class="sky-badge-done">Complete</span>' : '<span class="sky-badge-open">Open</span>') + '</td></tr>';
     }).join('');
-    var note = rows.length + ' ITR-A checksheet(s)' + (rows.length >= LIMIT ? ' (showing first ' + LIMIT + ')' : '');
+    var note = rows.length + ' ITR-A checksheet(s) · click a row for full detail' + (rows.length >= LIMIT ? ' (showing first ' + LIMIT + ')' : '');
     openModal('ITR-A Detail — ' + label, summaryHtml(disc, null) + bigTable(['Tag No', 'Subsystem', 'Discipline', 'CS Type', 'Plan Finish', 'Complete Date', 'Status'], body, note), exp, 'ITR-A_' + label);
+    wireRecs(el('sky-modal-body'));
   }
   function openPunchModal(disc, label) {
     var rows = window.PrecomDB.query(
@@ -345,11 +356,13 @@
     var exp = [['Punch No', 'Category', 'Status', 'Discipline', 'Tag No', 'Subsystem', 'Description']];
     var body = rows.map(function (r) {
       exp.push([r.punch_no, r.category, r.status, r.discipline, r.tag_no, r.subsystem, r.description]);
-      return '<tr><td class="mono">' + esc(r.punch_no) + '</td><td>' + esc(r.category) + '</td><td>' + esc(r.status || '') + '</td><td>' + esc(r.discipline || '') +
+      return '<tr class="sky-rrow" data-rt="punch" data-pn="' + esc(r.punch_no) + '">' +
+        '<td class="mono">' + esc(r.punch_no) + '</td><td>' + esc(r.category) + '</td><td>' + esc(r.status || '') + '</td><td>' + esc(r.discipline || '') +
         '</td><td class="mono">' + esc(r.tag_no || '') + '</td><td class="mono">' + esc(r.subsystem || '') + '</td><td class="l">' + esc(r.description || '') + '</td></tr>';
     }).join('');
-    var note = rows.length + ' punch item(s)' + (rows.length >= LIMIT ? ' (showing first ' + LIMIT + ')' : '');
+    var note = rows.length + ' punch item(s) · click a row for full detail' + (rows.length >= LIMIT ? ' (showing first ' + LIMIT + ')' : '');
     openModal('Punchlist Detail — ' + label, summaryHtml(disc, null) + bigTable(['Punch No', 'Category', 'Status', 'Discipline', 'Tag No', 'Subsystem', 'Description'], body, note), exp, 'Punch_' + label);
+    wireRecs(el('sky-modal-body'));
   }
   function openSubsysModal(disc) {
     var rows = window.PrecomDB.query(
@@ -434,14 +447,16 @@
     var itrBody = itr.map(function (r) {
       var done = r.complete_date && String(r.complete_date).trim();
       itrExp.push([r.tag_no, r.tag_desc, r.cs_type, r.plan_finish || '', r.complete_date || '', done ? 'Complete' : 'Open']);
-      return '<tr><td class="mono">' + esc(r.tag_no) + '</td><td class="l">' + esc(r.tag_desc || '') + '</td><td>' + esc(r.cs_type || '') +
+      return '<tr class="sky-rrow" data-rt="itr" data-ss="' + esc(ss) + '" data-tag="' + esc(r.tag_no) + '" data-cs="' + esc(r.cs_type || '') + '">' +
+        '<td class="mono">' + esc(r.tag_no) + '</td><td class="l">' + esc(r.tag_desc || '') + '</td><td>' + esc(r.cs_type || '') +
         '</td><td>' + esc(r.plan_finish || '') + '</td><td>' + esc(r.complete_date || '') + '</td><td>' +
         (done ? '<span class="sky-badge-done">Complete</span>' : '<span class="sky-badge-open">Open</span>') + '</td></tr>';
     }).join('');
     var punExp = [['Punch No', 'Category', 'Status', 'Tag No', 'Description']];
     var punBody = pun.map(function (r) {
       punExp.push([r.punch_no, r.category, r.status, r.tag_no, r.description]);
-      return '<tr><td class="mono">' + esc(r.punch_no) + '</td><td>' + esc(r.category) + '</td><td>' + esc(r.status || '') +
+      return '<tr class="sky-rrow" data-rt="punch" data-pn="' + esc(r.punch_no) + '">' +
+        '<td class="mono">' + esc(r.punch_no) + '</td><td>' + esc(r.category) + '</td><td>' + esc(r.status || '') +
         '</td><td class="mono">' + esc(r.tag_no || '') + '</td><td class="l">' + esc(r.description || '') + '</td></tr>';
     }).join('');
 
@@ -456,6 +471,66 @@
     openModal2(ss + ' · ' + discLabel(disc), html, function () {
       exportSheets([{ name: 'ITR-A', rows: itrExp }, { name: 'Punch', rows: punExp }], 'Detail_' + ss + '_' + disc);
     });
+    wireRecs(el('sky-m2-body'));
+  }
+
+  // ===== LEVEL-3: full detail of ONE record (ITR-A checksheet or Punch item) =====
+  var RLAB = { cs_type: 'CS Type', system_no: 'System No', subsystem: 'Subsystem', tag_no: 'Tag No', tag_desc: 'Tag Description', system_desc: 'System Description', subsystem_desc: 'Subsystem Description', punch_no: 'Punch No', punch_raised_no: 'Punch Raised No', drawing_no: 'Drawing No' };
+  function prettify(k) { return RLAB[k] || k.replace(/_/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); }); }
+  function ensureModal3() {
+    if (el('sky-modal3')) return;
+    var d = document.createElement('div');
+    d.id = 'sky-modal3'; d.className = 'sky-modal3';
+    d.innerHTML = '<div class="sky-win"><div class="sky-win-head"><h3 id="sky-m3-title"></h3>' +
+      '<button class="btn btn-secondary" id="sky-m3-export" style="padding:0.3rem 0.6rem;font-size:0.7rem;min-height:auto;">Export</button>' +
+      '<button class="sky-x" id="sky-m3-x" title="Back">&times;</button></div>' +
+      '<div class="sky-win-body" id="sky-m3-body"></div></div>';
+    document.body.appendChild(d);
+    el('sky-m3-x').onclick = closeModal3;
+    d.addEventListener('click', function (e) { if (e.target === d) closeModal3(); });
+  }
+  function closeModal3() { var m = el('sky-modal3'); if (m) m.classList.remove('open'); }
+  function wireRecs(bodyEl) {
+    if (!bodyEl) return;
+    bodyEl.querySelectorAll('tr[data-rt]').forEach(function (tr) {
+      tr.onclick = function () {
+        var rt = tr.getAttribute('data-rt');
+        if (rt === 'itr') openRecordModal('itr', { ss: tr.getAttribute('data-ss'), tag: tr.getAttribute('data-tag'), cs: tr.getAttribute('data-cs') });
+        else if (rt === 'punch') openRecordModal('punch', { pn: tr.getAttribute('data-pn') });
+      };
+    });
+  }
+  function openRecordModal(kind, key) {
+    function up(v) { return String(v == null ? '' : v).trim().toUpperCase(); }
+    var obj, title, csd = '';
+    if (kind === 'itr') {
+      obj = window.PrecomDB.query(
+        "SELECT * FROM itr_a WHERE UPPER(TRIM(subsystem))=? AND UPPER(TRIM(tag_no))=? AND UPPER(TRIM(COALESCE(cs_type,'')))=? LIMIT 1",
+        [up(key.ss), up(key.tag), up(key.cs)])[0];
+      if (!obj) return;
+      csd = (window.CS_TYPE_DESC && window.CS_TYPE_DESC[String(obj.cs_type || '').trim().toUpperCase()]) || '';
+      title = 'ITR-A · ' + (obj.tag_no || '') + ' · ' + (obj.cs_type || '');
+    } else {
+      obj = window.PrecomDB.query("SELECT * FROM punch_list WHERE UPPER(TRIM(punch_no))=? LIMIT 1", [up(key.pn)])[0];
+      if (!obj) return;
+      title = 'Punch · ' + (obj.punch_no || '');
+    }
+    var exp = [['Field', 'Value']];
+    var rowsHtml = '';
+    Object.keys(obj).forEach(function (k) {
+      var v = obj[k]; v = (v == null ? '' : String(v));
+      exp.push([prettify(k), v]);
+      rowsHtml += '<tr><td class="k">' + esc(prettify(k)) + '</td><td class="v">' + esc(v) + '</td></tr>';
+      if (kind === 'itr' && k === 'cs_type') {
+        exp.push(['CS Description', csd]);
+        rowsHtml += '<tr><td class="k">CS Description</td><td class="v">' + esc(csd) + '</td></tr>';
+      }
+    });
+    ensureModal3();
+    el('sky-m3-title').textContent = title;
+    el('sky-m3-body').innerHTML = '<div class="sky-rec-wrap"><table class="sky-rec"><tbody>' + rowsHtml + '</tbody></table></div>';
+    el('sky-m3-export').onclick = function () { exportSheets([{ name: kind === 'itr' ? 'ITR-A' : 'Punch', rows: exp }], (kind === 'itr' ? 'ITR_' + (obj.tag_no || '') : 'Punch_' + (obj.punch_no || '')).replace(/[^\w-]+/g, '_')); };
+    el('sky-modal3').classList.add('open');
   }
 
   // ---- Right panel ----
